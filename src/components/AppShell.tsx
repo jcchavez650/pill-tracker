@@ -1,0 +1,175 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useI18n } from "@/components/I18nProvider";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { PatientProvider, usePatient } from "@/components/PatientContext";
+import { NotificationsBell } from "@/components/NotificationsBell";
+import type { TranslationKey } from "@/lib/i18n";
+
+type NavItem = { href: string; key: TranslationKey; icon: string; caregiverOnly?: boolean };
+
+const NAV: NavItem[] = [
+  { href: "/today", key: "nav.today", icon: "☀️" },
+  { href: "/schedule", key: "nav.schedule", icon: "🗓️" },
+  { href: "/identify", key: "nav.identify", icon: "🔍" },
+  { href: "/reports", key: "nav.reports", icon: "📊" },
+  { href: "/patients", key: "nav.patients", icon: "👥", caregiverOnly: true },
+  { href: "/settings", key: "nav.settings", icon: "⚙️" },
+];
+
+function PatientSelector() {
+  const { isCaregiver, patients, patientId, setPatientId, selfId } = usePatient();
+  const { t } = useI18n();
+  if (!isCaregiver || patients.length === 0) return null;
+  return (
+    <select
+      value={patientId ?? selfId}
+      onChange={(e) => setPatientId(e.target.value)}
+      className="rounded-full border border-white/15 bg-ink-muted/70 px-4 py-2 text-sm text-cream outline-none focus:border-champagne/60"
+      aria-label={t("reports.patient")}
+    >
+      <option value={selfId}>{t("patients.myself")}</option>
+      {patients.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Chrome({
+  userName,
+  children,
+}: {
+  userName: string;
+  children: React.ReactNode;
+}) {
+  const { t } = useI18n();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { isCaregiver } = usePatient();
+
+  const items = NAV.filter((n) => !n.caregiverOnly || isCaregiver);
+
+  async function signOut() {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/signin");
+    router.refresh();
+  }
+
+  return (
+    <div className="min-h-dvh">
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/today" className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold-sheen text-lg shadow-gold">
+              💊
+            </span>
+            <span className="display hidden text-lg tracking-wide text-champagne-soft sm:block">
+              {t("app.name")}
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <PatientSelector />
+            <NotificationsBell />
+            <LanguageToggle />
+            <button
+              onClick={signOut}
+              className="hidden rounded-full border border-white/15 px-4 py-2 text-xs text-cream/70 transition hover:text-cream sm:inline-block"
+            >
+              {t("nav.signout")}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
+        {/* Sidebar nav (desktop) */}
+        <nav className="sticky top-20 hidden h-fit w-52 shrink-0 flex-col gap-1 md:flex">
+          <p className="px-3 pb-2 text-xs text-cream/40">{userName}</p>
+          {items.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition ${
+                  active
+                    ? "bg-champagne/15 text-champagne-soft"
+                    : "text-cream/70 hover:bg-white/5 hover:text-cream"
+                }`}
+              >
+                <span aria-hidden>{item.icon}</span>
+                {t(item.key)}
+              </Link>
+            );
+          })}
+          <button
+            onClick={signOut}
+            className="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-cream/50 transition hover:text-cream"
+          >
+            <span aria-hidden>🚪</span>
+            {t("nav.signout")}
+          </button>
+        </nav>
+
+        {/* Main content */}
+        <main className="min-w-0 flex-1 pb-24 md:pb-6">{children}</main>
+      </div>
+
+      {/* Bottom nav (mobile) */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/90 backdrop-blur-md md:hidden">
+        <div className="mx-auto flex max-w-6xl items-stretch justify-around">
+          {items.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] transition ${
+                  active ? "text-champagne-soft" : "text-cream/55"
+                }`}
+              >
+                <span className="text-lg" aria-hidden>
+                  {item.icon}
+                </span>
+                {t(item.key)}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+export function AppShell({
+  selfId,
+  userName,
+  isCaregiver,
+  children,
+}: {
+  selfId: string;
+  userName: string;
+  isCaregiver: boolean;
+  children: React.ReactNode;
+}) {
+  // Register the service worker for PWA + push once.
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
+  return (
+    <PatientProvider selfId={selfId} selfName={userName} isCaregiver={isCaregiver}>
+      <Chrome userName={userName}>{children}</Chrome>
+    </PatientProvider>
+  );
+}
