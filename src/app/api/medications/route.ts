@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
-import { saveImage } from "@/lib/upload";
+import { savePhoto } from "@/lib/upload";
 
 // GET /api/medications?patientId=...  — list a patient's medications
 export async function GET(req: Request) {
@@ -52,7 +52,8 @@ export async function POST(req: Request) {
   // If a reference photo (base64 data URL) was supplied, persist it.
   let referencePhotoUrl: string | null = null;
   if (typeof referencePhoto === "string" && referencePhoto.startsWith("data:")) {
-    referencePhotoUrl = await saveImage(referencePhoto);
+    const photo = await savePhoto(referencePhoto, "reference", user.id);
+    referencePhotoUrl = photo.url;
   }
 
   const cleanTimes: string[] = [

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
-import { saveImage } from "@/lib/upload";
+import { savePhoto } from "@/lib/upload";
 
 async function authorizeMed(medId: string) {
   const user = await getCurrentUser();
@@ -40,7 +40,8 @@ export async function PUT(
 
   let referencePhotoUrl: string | undefined;
   if (typeof referencePhoto === "string" && referencePhoto.startsWith("data:")) {
-    referencePhotoUrl = await saveImage(referencePhoto);
+    const photo = await savePhoto(referencePhoto, "reference", auth.user.id);
+    referencePhotoUrl = photo.url;
   }
 
   const data: Record<string, unknown> = {};

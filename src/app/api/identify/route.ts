@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { saveImage } from "@/lib/upload";
+import { savePhoto } from "@/lib/upload";
 import { identifyPill } from "@/lib/anthropic";
 import type { Locale } from "@/lib/i18n";
 
@@ -12,7 +12,7 @@ export async function GET() {
 
   const items = await prisma.pillQuestion.findMany({
     where: { userId: user.id },
-    include: { photo: true },
+    include: { photo: { select: { id: true, url: true } } },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
@@ -31,10 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "MISSING_PHOTO" }, { status: 400 });
   }
 
-  const url = await saveImage(body.photo);
-  const photo = await prisma.photo.create({
-    data: { url, kind: "question", uploadedById: user.id },
-  });
+  const photo = await savePhoto(body.photo, "question", user.id);
 
   let answer = "";
   try {
@@ -58,7 +55,7 @@ export async function POST(req: Request) {
       aiAnswer: answer,
       photoId: photo.id,
     },
-    include: { photo: true },
+    include: { photo: { select: { id: true, url: true } } },
   });
 
   return NextResponse.json({ item: record });

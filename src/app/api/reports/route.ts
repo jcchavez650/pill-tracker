@@ -28,7 +28,10 @@ export async function GET(req: Request) {
 
   const doses = await prisma.doseLog.findMany({
     where: { patientId, scheduledFor: { gte: from, lte: to } },
-    include: { medication: true, confirmationPhoto: true },
+    include: {
+      medication: true,
+      confirmationPhoto: { select: { id: true, url: true } },
+    },
     orderBy: { scheduledFor: "desc" },
   });
 

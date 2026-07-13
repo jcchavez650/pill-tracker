@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     },
     include: {
       medication: true,
-      confirmationPhoto: true,
+      confirmationPhoto: { select: { id: true, url: true } },
     },
     orderBy: { scheduledFor: "asc" },
   });

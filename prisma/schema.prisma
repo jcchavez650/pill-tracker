@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -114,10 +114,12 @@ model DoseLog {
 }
 
 model Photo {
-  id         String   @id @default(cuid())
-  url        String // relative path under /public/uploads (or object-store URL in prod)
-  kind       String   @default("confirmation") // confirmation | reference | question
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  url         String // serving path: /api/uploads/<id>
+  kind        String   @default("confirmation") // confirmation | reference | question
+  data        Bytes // the image bytes, stored in the DB so photos persist without a volume
+  contentType String   @default("image/jpeg")
+  createdAt   DateTime @default(now())
 
   uploadedById String
   uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
