@@ -1,0 +1,166 @@
+// Pill Tracker data model.
+// SQLite for easy local/self-hosted use; data persists indefinitely in the DB file.
+// For production scale, switch `provider` to "postgresql" and set DATABASE_URL accordingly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CAREGIVER
+  PATIENT
+}
+
+enum DoseStatus {
+  PENDING
+  TAKEN
+  MISSED
+  SKIPPED
+}
+
+// Result of Claude's photo confirmation of a taken dose.
+enum AiVerdict {
+  UNVERIFIED
+  MATCH
+  MISMATCH
+  UNSURE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(PATIENT)
+  locale       String   @default("en") // "en" | "es"
+  createdAt    DateTime @default(now())
+
+  // A caregiver manages many patients. A patient has one managing caregiver.
+  caregiverId String?
+  caregiver   User?   @relation("Caregiving", fields: [caregiverId], references: [id])
+  patients    User[]  @relation("Caregiving")
+
+  medications       Medication[]       @relation("PatientMeds")
+  createdMeds       Medication[]       @relation("CreatorMeds")
+  doses             DoseLog[]
+  photos            Photo[]
+  pillQuestions     PillQuestion[]
+  pushSubscriptions PushSubscription[]
+  notifications     Notification[]
+}
+
+model Medication {
+  id           String   @id @default(cuid())
+  name         String
+  strength     String? // e.g. "10 mg"
+  form         String? // tablet, capsule, liquid...
+  instructions String? // "Take with food"
+  color        String?
+  shape        String?
+  imprint      String? // text stamped on the pill
+  referencePhotoUrl String? // the "this is what it looks like" photo
+  active       Boolean  @default(true)
+  startDate    DateTime @default(now())
+  endDate      DateTime?
+  createdAt    DateTime @default(now())
+
+  patientId String
+  patient   User   @relation("PatientMeds", fields: [patientId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CreatorMeds", fields: [createdById], references: [id])
+
+  times DoseTime[]
+  doses DoseLog[]
+}
+
+// A time-of-day this medication should be taken (24h "HH:MM"). Every day by default.
+model DoseTime {
+  id           String @id @default(cuid())
+  time         String // "08:00"
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+}
+
+// A concrete scheduled dose instance for a specific date/time.
+model DoseLog {
+  id           String     @id @default(cuid())
+  scheduledFor DateTime
+  status       DoseStatus @default(PENDING)
+  takenAt      DateTime?
+
+  aiVerdict     AiVerdict @default(UNVERIFIED)
+  aiConfidence  Int? // 0-100
+  aiNotes       String?
+
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  patientId String
+  patient   User   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  confirmationPhotoId String? @unique
+  confirmationPhoto   Photo?  @relation(fields: [confirmationPhotoId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([medicationId, scheduledFor])
+  @@index([patientId, scheduledFor])
+}
+
+model Photo {
+  id         String   @id @default(cuid())
+  url        String // relative path under /public/uploads (or object-store URL in prod)
+  kind       String   @default("confirmation") // confirmation | reference | question
+  createdAt  DateTime @default(now())
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  dose         DoseLog?
+  pillQuestion PillQuestion?
+}
+
+// A "what is this pill?" identification request answered by Claude.
+model PillQuestion {
+  id        String   @id @default(cuid())
+  question  String? // optional free-text from the user
+  aiAnswer  String? // Claude's identification / guidance
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  photoId String? @unique
+  photo   Photo?  @relation(fields: [photoId], references: [id])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String // reminder | missed | confirmation | question
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
