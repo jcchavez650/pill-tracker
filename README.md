@@ -78,15 +78,41 @@ Push reminders are sent by an endpoint that a scheduler calls every few minutes:
 GET /api/cron/reminders   Authorization: Bearer <CRON_SECRET>
 ```
 
-It sends "time to take X" reminders for doses due now, marks long-overdue doses as missed, and alerts caregivers. Wire it to Vercel Cron, GitHub Actions, or a free service like cron-job.org. An example GitHub Actions workflow is included at `.github/workflows/reminders.yml`.
+It sends "time to take X" reminders for doses due now, marks long-overdue doses as missed, and alerts caregivers. Wire it to GitHub Actions (workflow included at `.github/workflows/reminders.yml`), Railway's cron, or a free service like cron-job.org.
 
-## Deploying
+## Deploying to Railway
 
-The app runs anywhere Next.js runs. For production:
+The app is configured to deploy to **[Railway](https://railway.app)** as a single service backed by a persistent **volume**, so the database and uploaded photos survive redeploys. No separate database service is required — it keeps SQLite on the volume.
 
-1. Switch `prisma/schema.prisma` datasource to `postgresql` and set `DATABASE_URL` to a managed Postgres.
-2. Move uploaded photos from local disk to object storage (S3 / Cloudflare R2) — see `src/lib/upload.ts` (the interface stays the same).
-3. Serve over **HTTPS** (required for camera and push).
+### One-time setup
+
+1. **Create the project** — on Railway, _New Project → Deploy from GitHub repo_ and pick `pill-tracker`. Railway auto-detects the config in `railway.json` / `nixpacks.toml`.
+2. **Add a volume** — in the service, _Settings → Volumes → Add Volume_, mount path `/data`. This is where the DB and photos live permanently.
+3. **Set environment variables** (_Variables_ tab):
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | `file:/data/prod.db` |
+   | `UPLOAD_DIR` | `/data/uploads` |
+   | `AUTH_SECRET` | a long random string |
+   | `ANTHROPIC_API_KEY` | your Anthropic key |
+   | `ANTHROPIC_MODEL` | `claude-sonnet-5` |
+   | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | from `npx web-push generate-vapid-keys` |
+   | `VAPID_SUBJECT` | `mailto:you@example.com` |
+   | `CRON_SECRET` | a random string |
+
+4. **Deploy.** On boot, `scripts/start.sh` runs `prisma db push` to create the tables on the volume, then starts Next.js. Railway provides HTTPS automatically (required for camera + push).
+5. **Generate a domain** — _Settings → Networking → Generate Domain_ — and open it on your phone, then _Add to Home Screen_.
+
+> **Seeding (optional):** to create demo accounts, run `npm run db:seed` once from the Railway shell (or a local machine pointed at the same `DATABASE_URL`).
+
+### Prefer Railway Postgres instead of SQLite?
+
+Change the datasource in `prisma/schema.prisma` to `postgresql`, add a Railway Postgres plugin, and set `DATABASE_URL` to the provided connection string. You still keep the `/data` volume for photo uploads (`UPLOAD_DIR`).
+
+### Reminders on Railway
+
+Add a second service (or a Railway cron) that calls `POST /api/cron/reminders` with `Authorization: Bearer <CRON_SECRET>` every few minutes, or just keep the included GitHub Actions workflow (set its `APP_URL` and `CRON_SECRET` repo secrets to your Railway URL).
 
 ## Project layout
 

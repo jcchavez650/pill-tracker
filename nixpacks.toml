@@ -1,0 +1,4 @@
+# Nixpacks build config for Railway.
+# Ensures OpenSSL + CA certs are present so the Prisma query engine loads.
+[phases.setup]
+aptPkgs = ["openssl", "ca-certificates"]
