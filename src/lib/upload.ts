@@ -1,38 +1,37 @@
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import crypto from "crypto";
+import { prisma } from "./prisma";
 import { parseDataUrl } from "./anthropic";
+import type { Photo } from "@prisma/client";
 
 /**
- * Directory where uploaded photos are stored.
- * - Local dev: defaults to ./public/uploads
- * - Railway (or any host with a persistent disk): set UPLOAD_DIR to a path on
- *   the mounted volume, e.g. /data/uploads, so photos survive redeploys.
+ * Persist a base64 data-URL image into the database (as bytes) and return the
+ * created Photo row. Storing image bytes in the DB means photos survive
+ * redeploys without a mounted volume or external object storage — the whole
+ * app persists in one managed Postgres database.
  *
- * Files are always served back through /api/uploads/<name>, so serving does not
- * depend on the file living under Next's public/ folder.
+ * The row's `url` is the serving path `/api/uploads/<id>`.
  */
-export const UPLOAD_DIR =
-  process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
-
-/**
- * Persist a base64 data-URL image and return its public URL
- * (`/api/uploads/<filename>`).
- */
-export async function saveImage(dataUrl: string): Promise<string> {
+export async function savePhoto(
+  dataUrl: string,
+  kind: "confirmation" | "reference" | "question",
+  uploadedById: string
+): Promise<Photo> {
   const parsed = parseDataUrl(dataUrl);
   if (!parsed) throw new Error("INVALID_IMAGE");
 
-  const ext =
-    parsed.mediaType === "image/png"
-      ? "png"
-      : parsed.mediaType === "image/webp"
-      ? "webp"
-      : "jpg";
-  const name = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${ext}`;
+  const bytes = Buffer.from(parsed.data, "base64");
 
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, name), Buffer.from(parsed.data, "base64"));
+  const photo = await prisma.photo.create({
+    data: {
+      url: "", // filled in below once we have the id
+      kind,
+      data: bytes,
+      contentType: parsed.mediaType,
+      uploadedById,
+    },
+  });
 
-  return `/api/uploads/${name}`;
+  return prisma.photo.update({
+    where: { id: photo.id },
+    data: { url: `/api/uploads/${photo.id}` },
+  });
 }

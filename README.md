@@ -18,7 +18,7 @@ A luxurious, bilingual (English / Spanish) **medication management** app for car
 ## Tech stack
 
 - **Next.js 15** (App Router) + React 19 + TypeScript
-- **Prisma** ORM with **SQLite** (swap to Postgres for production)
+- **Prisma** ORM with **PostgreSQL** (photos stored as bytes in the DB — no volume needed)
 - **Tailwind CSS** — custom "champagne on charcoal" luxe theme
 - **@anthropic-ai/sdk** — Claude vision for pill ID & confirmation
 - **web-push** (VAPID) — browser/PWA push notifications
@@ -37,7 +37,7 @@ Then edit `.env`:
 
 | Variable | What it's for |
 | --- | --- |
-| `DATABASE_URL` | SQLite file path (default is fine locally) |
+| `DATABASE_URL` | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/pilltracker`) |
 | `AUTH_SECRET` | Random string for signing sessions — generate one (see below) |
 | `ANTHROPIC_API_KEY` | Your key from [console.anthropic.com](https://console.anthropic.com/settings/keys) — powers pill ID & confirmation |
 | `ANTHROPIC_MODEL` | Claude vision model (default `claude-sonnet-5`) |
@@ -54,6 +54,8 @@ npx web-push generate-vapid-keys                                            # VA
 > The app runs **without** the Anthropic key — AI features simply show a "not configured" message until you add it. Add `ANTHROPIC_API_KEY` to switch them on.
 
 ### 2. Create the database
+
+Point `DATABASE_URL` at any PostgreSQL instance (local Postgres, Docker, or a hosted one), then:
 
 ```bash
 npm run db:push     # creates tables
@@ -82,18 +84,17 @@ It sends "time to take X" reminders for doses due now, marks long-overdue doses 
 
 ## Deploying to Railway
 
-The app is configured to deploy to **[Railway](https://railway.app)** as a single service backed by a persistent **volume**, so the database and uploaded photos survive redeploys. No separate database service is required — it keeps SQLite on the volume.
+The app deploys to **[Railway](https://railway.app)** with a managed **PostgreSQL** database — **no volume required**. All data, including pill photos (stored as bytes in the database), lives in Postgres and survives every redeploy.
 
 ### One-time setup
 
 1. **Create the project** — on Railway, _New Project → Deploy from GitHub repo_ and pick `pill-tracker`. Railway auto-detects the config in `railway.json` / `nixpacks.toml`.
-2. **Add a volume** — in the service, _Settings → Volumes → Add Volume_, mount path `/data`. This is where the DB and photos live permanently.
-3. **Set environment variables** (_Variables_ tab):
+2. **Add PostgreSQL** — in the project, _New → Database → Add PostgreSQL_. Railway creates it with a `DATABASE_URL` variable you can reference.
+3. **Set environment variables** on the app service (_Variables_ tab):
 
    | Variable | Value |
    | --- | --- |
-   | `DATABASE_URL` | `file:/data/prod.db` |
-   | `UPLOAD_DIR` | `/data/uploads` |
+   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (references the Postgres service) |
    | `AUTH_SECRET` | a long random string |
    | `ANTHROPIC_API_KEY` | your Anthropic key |
    | `ANTHROPIC_MODEL` | `claude-sonnet-5` |
@@ -101,14 +102,14 @@ The app is configured to deploy to **[Railway](https://railway.app)** as a singl
    | `VAPID_SUBJECT` | `mailto:you@example.com` |
    | `CRON_SECRET` | a random string |
 
-4. **Deploy.** On boot, `scripts/start.sh` runs `prisma db push` to create the tables on the volume, then starts Next.js. Railway provides HTTPS automatically (required for camera + push).
+4. **Deploy.** On boot, `scripts/start.sh` runs `prisma db push` to create the tables in Postgres, then starts Next.js. Railway provides HTTPS automatically (required for camera + push).
 5. **Generate a domain** — _Settings → Networking → Generate Domain_ — and open it on your phone, then _Add to Home Screen_.
 
 > **Seeding (optional):** to create demo accounts, run `npm run db:seed` once from the Railway shell (or a local machine pointed at the same `DATABASE_URL`).
 
-### Prefer Railway Postgres instead of SQLite?
+### Photo storage
 
-Change the datasource in `prisma/schema.prisma` to `postgresql`, add a Railway Postgres plugin, and set `DATABASE_URL` to the provided connection string. You still keep the `/data` volume for photo uploads (`UPLOAD_DIR`).
+Uploaded photos are stored as bytes in the `Photo` table and served via `GET /api/uploads/<id>`. This keeps everything in one database with no volume or external object storage. If you later expect very high photo volume, you can move `src/lib/upload.ts` to S3/Cloudflare R2 — the `/api/uploads` serving path and callers stay the same.
 
 ### Reminders on Railway
 

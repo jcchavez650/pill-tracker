@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
-import { saveImage } from "@/lib/upload";
+import { savePhoto } from "@/lib/upload";
 import { confirmDosePhoto } from "@/lib/anthropic";
 import { sendPushToUser } from "@/lib/push";
 import type { Locale } from "@/lib/i18n";
@@ -40,10 +40,7 @@ export async function POST(
   let notes: string | null = null;
 
   if (typeof body.photo === "string" && body.photo.startsWith("data:")) {
-    const url = await saveImage(body.photo);
-    const photo = await prisma.photo.create({
-      data: { url, kind: "confirmation", uploadedById: user.id },
-    });
+    const photo = await savePhoto(body.photo, "confirmation", user.id);
     photoId = photo.id;
 
     try {
@@ -79,7 +76,10 @@ export async function POST(
       aiConfidence: confidence,
       aiNotes: notes,
     },
-    include: { medication: true, confirmationPhoto: true },
+    include: {
+      medication: true,
+      confirmationPhoto: { select: { id: true, url: true } },
+    },
   });
 
   // Notify the managing caregiver (if a patient took the dose, and especially
