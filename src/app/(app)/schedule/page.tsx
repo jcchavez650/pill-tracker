@@ -163,7 +163,7 @@ function MedForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [form, setForm] = useState<FormState>(
     medication
       ? {
@@ -180,9 +180,51 @@ function MedForm({
       : emptyForm
   );
   const [busy, setBusy] = useState(false);
+  const [rxPhoto, setRxPhoto] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(
+    null
+  );
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function scanRx() {
+    if (!rxPhoto) return;
+    setScanning(true);
+    setScanMsg(null);
+    try {
+      const res = await fetch("/api/medications/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo: rxPhoto, locale }),
+      });
+      const data = await res.json();
+      const f = data.fields;
+      if (!res.ok || !f || f.notFound) {
+        setScanMsg({ ok: false, text: t("med.scanFailed") });
+        return;
+      }
+      // Merge any fields the AI found into the form (keep existing otherwise).
+      setForm((prev) => ({
+        ...prev,
+        name: f.name || prev.name,
+        strength: f.strength || prev.strength,
+        form: f.form || prev.form,
+        instructions: f.instructions || prev.instructions,
+        color: f.color || prev.color,
+        shape: f.shape || prev.shape,
+        imprint: f.imprint || prev.imprint,
+        times:
+          Array.isArray(f.times) && f.times.length > 0 ? f.times : prev.times,
+      }));
+      setScanMsg({ ok: true, text: t("med.scanReview") });
+    } catch {
+      setScanMsg({ ok: false, text: t("med.scanFailed") });
+    } finally {
+      setScanning(false);
+    }
   }
 
   async function save() {
@@ -215,6 +257,53 @@ function MedForm({
       title={medication ? t("med.editTitle") : t("med.addTitle")}
     >
       <div className="space-y-4">
+        {/* AI prescription scan */}
+        <div className="rounded-2xl border border-champagne/25 bg-champagne/5 p-4">
+          <div className="mb-1 flex items-center gap-2">
+            <span aria-hidden>✨</span>
+            <h3 className="text-sm font-semibold text-champagne-soft">
+              {t("med.scanTitle")}
+            </h3>
+          </div>
+          <p className="mb-3 text-xs text-cream/60">{t("med.scanHint")}</p>
+          <PhotoCapture
+            value={rxPhoto}
+            onChange={(v) => {
+              setRxPhoto(v);
+              setScanMsg(null);
+            }}
+            label={t("med.scanTitle")}
+          />
+          {rxPhoto && (
+            <button
+              type="button"
+              className="btn-gold mt-3 w-full"
+              disabled={scanning}
+              onClick={scanRx}
+            >
+              {scanning ? t("med.scanning") : t("med.scanButton")}
+            </button>
+          )}
+          {scanMsg && (
+            <p
+              className={`mt-3 text-sm ${
+                scanMsg.ok ? "text-emerald-200" : "text-amber-200"
+              }`}
+            >
+              {scanMsg.ok ? "✓ " : "⚠️ "}
+              {scanMsg.text}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="text-xs uppercase tracking-wider text-cream/40">
+            {t("med.orManually")}
+          </span>
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+
         <div>
           <label className="label">{t("med.name")}</label>
           <input

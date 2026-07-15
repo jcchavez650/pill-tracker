@@ -84,6 +84,131 @@ export async function identifyPill(
   return { answer };
 }
 
+export type RxExtraction = {
+  name: string;
+  strength: string;
+  form: string;
+  instructions: string;
+  color: string;
+  shape: string;
+  imprint: string;
+  times: string[]; // suggested "HH:MM" times inferred from the directions
+  notFound: boolean; // true if no prescription could be read from the image
+};
+
+const EMPTY_RX: RxExtraction = {
+  name: "",
+  strength: "",
+  form: "",
+  instructions: "",
+  color: "",
+  shape: "",
+  imprint: "",
+  times: [],
+  notFound: true,
+};
+
+/**
+ * Read a prescription label / bottle / pill photo and extract structured
+ * medication details to prefill the "Add medication" form.
+ */
+export async function extractRx(
+  imageDataUrl: string,
+  locale: "en" | "es"
+): Promise<RxExtraction> {
+  const client = getClient();
+  const parsed = parseDataUrl(imageDataUrl);
+  if (!parsed) throw new Error("INVALID_IMAGE");
+  if (!client) return { ...EMPTY_RX };
+
+  const langInstruction =
+    locale === "es"
+      ? "Write the `instructions` value in Spanish."
+      : "Write the `instructions` value in English.";
+
+  const prompt = `You are reading a prescription. The image may be a pharmacy label, a medication bottle, a package, or the pill itself.
+
+Extract what you can and respond with ONLY a JSON object (no markdown, no code fences) of this exact shape:
+{
+  "name": "<medication name, brand or generic>",
+  "strength": "<e.g. 10 mg>",
+  "form": "<tablet | capsule | liquid | etc.>",
+  "instructions": "<the directions / sig, e.g. 'Take 1 tablet by mouth twice daily with food'>",
+  "color": "<pill color if visible, else empty>",
+  "shape": "<pill shape if visible, else empty>",
+  "imprint": "<pill imprint/marking if visible, else empty>",
+  "times": ["HH:MM", ...],
+  "notFound": <true only if the image shows no readable medication information>
+}
+
+Rules:
+- Use an empty string "" for any field you cannot determine. Do not guess.
+- For "times": infer reasonable 24-hour clock times from the directions. Examples:
+  "once daily"/"every morning" -> ["08:00"]; "twice daily" -> ["08:00","20:00"];
+  "three times daily" -> ["08:00","14:00","20:00"]; "at bedtime" -> ["21:00"];
+  "every 8 hours" -> ["06:00","14:00","22:00"]. If you cannot tell, use [].
+- ${langInstruction}
+- Respond with the JSON object only.`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 600,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: parsed.mediaType,
+              data: parsed.data,
+            },
+          },
+          { type: "text", text: prompt },
+        ],
+      },
+    ],
+  });
+
+  const raw = resp.content
+    .filter((b) => b.type === "text")
+    .map((b) => (b as { text: string }).text)
+    .join("")
+    .trim();
+
+  try {
+    const jsonStr = raw
+      .replace(/^```(?:json)?/i, "")
+      .replace(/```$/, "")
+      .trim();
+    const p = JSON.parse(jsonStr) as Partial<RxExtraction>;
+    const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+    const times = Array.isArray(p.times)
+      ? [
+          ...new Set(
+            p.times
+              .map((t) => str(t))
+              .filter((t) => /^\d{2}:\d{2}$/.test(t))
+          ),
+        ].sort()
+      : [];
+    return {
+      name: str(p.name),
+      strength: str(p.strength),
+      form: str(p.form),
+      instructions: str(p.instructions),
+      color: str(p.color),
+      shape: str(p.shape),
+      imprint: str(p.imprint),
+      times,
+      notFound: p.notFound === true || (!str(p.name) && times.length === 0),
+    };
+  } catch {
+    return { ...EMPTY_RX };
+  }
+}
+
 export type ConfirmationResult = {
   verdict: "MATCH" | "MISMATCH" | "UNSURE";
   confidence: number; // 0-100
