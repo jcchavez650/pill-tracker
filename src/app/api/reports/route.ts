@@ -51,5 +51,5 @@ export async function GET(req: Request) {
   const scheduled = counts.TAKEN + counts.MISSED; // skipped/pending excluded
   const adherence = scheduled === 0 ? null : Math.round((counts.TAKEN / scheduled) * 100);
 
-  return NextResponse.json({ counts, adherence, range, doses });
+  return NextResponse.json({ counts, adherence, range, doses, tz });
 }

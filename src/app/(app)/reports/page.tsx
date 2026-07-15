@@ -10,6 +10,7 @@ type ReportData = {
   adherence: number | null;
   range: number;
   doses: Dose[];
+  tz: string;
 };
 
 export default function ReportsPage() {
@@ -134,6 +135,7 @@ export default function ReportsPage() {
                             day: "numeric",
                             hour: "numeric",
                             minute: "2-digit",
+                            timeZone: data.tz,
                           }
                         )}
                       </p>

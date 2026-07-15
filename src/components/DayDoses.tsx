@@ -57,6 +57,7 @@ export function DayDoses({
   const { patientId } = usePatient();
   const [doses, setDoses] = useState<Dose[]>([]);
   const [asNeededMeds, setAsNeededMeds] = useState<Medication[]>([]);
+  const [tz, setTz] = useState<string>("UTC");
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Dose | null>(null);
   const [prnActive, setPrnActive] = useState<Medication | null>(null);
@@ -73,6 +74,7 @@ export function DayDoses({
       const data = await res.json();
       setDoses(data.doses || []);
       setAsNeededMeds(data.asNeeded || []);
+      if (data.tz) setTz(data.tz);
     } finally {
       setLoading(false);
     }
@@ -102,9 +104,11 @@ export function DayDoses({
   const loc = locale === "es" ? "es" : "en";
 
   function fmtTime(iso: string) {
+    // Always show the patient's local time, regardless of the viewer's device.
     return new Date(iso).toLocaleTimeString(loc, {
       hour: "numeric",
       minute: "2-digit",
+      timeZone: tz,
     });
   }
 
@@ -114,6 +118,7 @@ export function DayDoses({
     weekday: "long",
     month: "long",
     day: "numeric",
+    timeZone: tz,
   });
 
   return (
