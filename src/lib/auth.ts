@@ -15,6 +15,7 @@ export type SessionUser = {
   name: string;
   role: Role;
   locale: string;
+  timezone: string;
 };
 
 export async function hashPassword(password: string): Promise<string> {
@@ -63,6 +64,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       name: user.name,
       role: user.role,
       locale: user.locale,
+      timezone: user.timezone,
     };
   } catch {
     return null;

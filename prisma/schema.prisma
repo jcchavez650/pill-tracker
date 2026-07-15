@@ -38,6 +38,7 @@ model User {
   name         String
   role         Role     @default(PATIENT)
   locale       String   @default("en") // "en" | "es"
+  timezone     String   @default("UTC") // IANA tz, e.g. "America/New_York"
   createdAt    DateTime @default(now())
 
   // A caregiver manages many patients. A patient has one managing caregiver.
@@ -69,6 +70,16 @@ model Medication {
   endDate      DateTime?
   createdAt    DateTime @default(now())
 
+  // Scheduling flexibility
+  asNeeded     Boolean  @default(false) // PRN — taken as needed, not on a fixed schedule
+  daysOfWeek   String? // CSV of 0(Sun)..6(Sat), e.g. "1,3,5"; null = every day
+
+  // Supply / refill tracking
+  quantityPerDose Int  @default(1) // pills consumed per dose
+  supplyCount     Int? // pills remaining; null = not tracked
+  supplyThreshold Int? @default(10) // low-supply alert when supplyCount <= this
+  lowSupplyNotified Boolean @default(false) // avoid repeat low-supply alerts
+
   patientId String
   patient   User   @relation("PatientMeds", fields: [patientId], references: [id], onDelete: Cascade)
 
@@ -97,6 +108,8 @@ model DoseLog {
   aiVerdict     AiVerdict @default(UNVERIFIED)
   aiConfidence  Int? // 0-100
   aiNotes       String?
+
+  prepped       Boolean   @default(false) // caregiver pre-set this dose (prep checklist)
 
   medicationId String
   medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)

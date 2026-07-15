@@ -6,6 +6,11 @@
   color-scheme: dark;
 }
 
+/* Accessibility: larger text mode scales all rem-based sizing. */
+:root.text-large {
+  font-size: 118.75%; /* ~19px base */
+}
+
 body {
   @apply bg-ink text-cream font-sans antialiased;
   background-image:

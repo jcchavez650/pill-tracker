@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { materializeDoses } from "@/lib/dose";
 import { sendPushToUser } from "@/lib/push";
 import { translate } from "@/lib/i18n";
+import { todayYMD } from "@/lib/tz";
 import type { Locale } from "@/lib/i18n";
 
 /**
@@ -28,14 +29,23 @@ async function handle(req: Request) {
   const now = new Date();
   const patients = await prisma.user.findMany({
     where: { role: "PATIENT" },
-    select: { id: true, name: true, locale: true, caregiverId: true },
+    select: {
+      id: true,
+      name: true,
+      locale: true,
+      caregiverId: true,
+      timezone: true,
+    },
   });
 
   let reminders = 0;
   let missed = 0;
 
   for (const patient of patients) {
-    await materializeDoses(patient.id, now);
+    const tz = patient.timezone || "UTC";
+    // Materialize today's doses in the patient's timezone (covers tz where the
+    // local day differs from the server's UTC day).
+    await materializeDoses(patient.id, todayYMD(tz), tz);
     const locale: Locale = patient.locale === "es" ? "es" : "en";
 
     // Doses due within the last/next 5 minutes, still pending.

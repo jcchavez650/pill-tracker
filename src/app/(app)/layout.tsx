@@ -15,6 +15,7 @@ export default async function AppLayout({
       selfId={user.id}
       userName={user.name}
       isCaregiver={user.role === "CAREGIVER"}
+      timezone={user.timezone}
     >
       {children}
     </AppShell>

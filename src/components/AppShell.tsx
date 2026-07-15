@@ -14,6 +14,7 @@ type NavItem = { href: string; key: TranslationKey; icon: string; caregiverOnly?
 const NAV: NavItem[] = [
   { href: "/today", key: "nav.today", icon: "☀️" },
   { href: "/tomorrow", key: "nav.tomorrow", icon: "🌙" },
+  { href: "/week", key: "nav.week", icon: "📆" },
   { href: "/schedule", key: "nav.schedule", icon: "🗓️" },
   { href: "/identify", key: "nav.identify", icon: "🔍" },
   { href: "/reports", key: "nav.reports", icon: "📊" },
@@ -154,11 +155,13 @@ export function AppShell({
   selfId,
   userName,
   isCaregiver,
+  timezone,
   children,
 }: {
   selfId: string;
   userName: string;
   isCaregiver: boolean;
+  timezone: string;
   children: React.ReactNode;
 }) {
   // Register the service worker for PWA + push once.
@@ -166,6 +169,30 @@ export function AppShell({
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+  }, []);
+
+  // Auto-detect the timezone on first use if it hasn't been set yet.
+  useEffect(() => {
+    if (timezone && timezone !== "UTC") return;
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected && detected !== "UTC") {
+        fetch("/api/settings/timezone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timezone: detected }),
+        }).catch(() => {});
+      }
+    } catch {}
+  }, [timezone]);
+
+  // Apply the saved large-text preference.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("pt_textsize") === "large") {
+        document.documentElement.classList.add("text-large");
+      }
+    } catch {}
   }, []);
 
   return (

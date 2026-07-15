@@ -6,7 +6,7 @@ import { usePatient } from "@/components/PatientContext";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { Modal } from "@/components/Modal";
 import { displayStatus, type DisplayStatus } from "@/lib/doseStatus";
-import type { Dose } from "@/lib/types";
+import type { Dose, Medication } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 
 const STATUS_STYLE: Record<DisplayStatus, string> = {
@@ -56,8 +56,10 @@ export function DayDoses({
   const { t, locale } = useI18n();
   const { patientId } = usePatient();
   const [doses, setDoses] = useState<Dose[]>([]);
+  const [asNeededMeds, setAsNeededMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Dose | null>(null);
+  const [prnActive, setPrnActive] = useState<Medication | null>(null);
 
   const dateStr = ymd(dayOffset);
 
@@ -70,10 +72,23 @@ export function DayDoses({
       );
       const data = await res.json();
       setDoses(data.doses || []);
+      setAsNeededMeds(data.asNeeded || []);
     } finally {
       setLoading(false);
     }
   }, [patientId, dateStr]);
+
+  async function togglePrep(dose: Dose, prepped: boolean) {
+    // Optimistic update for the prep checklist.
+    setDoses((ds) =>
+      ds.map((d) => (d.id === dose.id ? { ...d, prepped } : d))
+    );
+    await fetch(`/api/doses/${dose.id}/prep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prepped }),
+    }).catch(() => {});
+  }
 
   useEffect(() => {
     load();
@@ -113,11 +128,15 @@ export function DayDoses({
         {dayOffset !== 0 && (
           <p className="mt-1 text-sm capitalize text-champagne/70">{dateLabel}</p>
         )}
+        {!interactive && doses.length > 0 && (
+          <p className="mt-2 text-xs text-cream/50">🌙 {t("tomorrow.prepHint")}</p>
+        )}
       </header>
 
       {loading ? (
         <p className="text-cream/50">{t("common.loading")}</p>
-      ) : doses.length === 0 ? (
+      ) : doses.length === 0 &&
+        !(interactive && asNeededMeds.length > 0) ? (
         <div className="card p-10 text-center text-cream/60">
           {t("today.nothing")}
         </div>
@@ -188,10 +207,72 @@ export function DayDoses({
                       {t("today.take")}
                     </button>
                   )}
+
+                  {/* Prep checklist (tomorrow / read-only days) */}
+                  {!interactive && (
+                    <label className="flex shrink-0 cursor-pointer flex-col items-center gap-1">
+                      <input
+                        type="checkbox"
+                        className="h-6 w-6 accent-champagne"
+                        checked={Boolean(dose.prepped)}
+                        onChange={(e) => togglePrep(dose, e.target.checked)}
+                      />
+                      <span className="text-[10px] text-cream/50">
+                        {t("tomorrow.prepped")}
+                      </span>
+                    </label>
+                  )}
                 </div>
               );
             })}
           </div>
+
+          {/* As-needed (PRN) medications — take any time (today only). */}
+          {interactive && asNeededMeds.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="display text-xl text-cream/80">
+                {t("today.asNeededTitle")}
+              </h2>
+              {asNeededMeds.map((med) => (
+                <div
+                  key={med.id}
+                  className="card flex items-center gap-4 p-4 sm:p-5"
+                >
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-ink-muted">
+                    {med.referencePhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={med.referencePhotoUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl">💊</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-lg font-semibold text-cream">
+                      {med.name}{" "}
+                      {med.strength && (
+                        <span className="text-xs font-normal text-cream/50">
+                          {med.strength}
+                        </span>
+                      )}
+                    </h3>
+                    {med.instructions && (
+                      <p className="text-sm text-cream/55">{med.instructions}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setPrnActive(med)}
+                    className="btn-gold shrink-0 !px-4 !py-2.5 text-xs sm:text-sm"
+                  >
+                    {t("today.takeNow")}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
         </>
       )}
 
@@ -206,17 +287,31 @@ export function DayDoses({
           }}
         />
       )}
+
+      {prnActive && (
+        <ConfirmModal
+          prnMedication={prnActive}
+          locale={loc}
+          onClose={() => setPrnActive(null)}
+          onDone={() => {
+            setPrnActive(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function ConfirmModal({
   dose,
+  prnMedication,
   locale,
   onClose,
   onDone,
 }: {
-  dose: Dose;
+  dose?: Dose;
+  prnMedication?: Medication;
   locale: "en" | "es";
   onClose: () => void;
   onDone: () => void;
@@ -233,11 +328,24 @@ function ConfirmModal({
   async function submit(withPhoto: boolean) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/doses/${dose.id}/take`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo: withPhoto ? photo : undefined, locale }),
-      });
+      const res = prnMedication
+        ? await fetch(`/api/doses/prn`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              medicationId: prnMedication.id,
+              photo: withPhoto ? photo : undefined,
+              locale,
+            }),
+          })
+        : await fetch(`/api/doses/${dose!.id}/take`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              photo: withPhoto ? photo : undefined,
+              locale,
+            }),
+          });
       const data = await res.json();
       if (withPhoto && data.dose) {
         setResult({

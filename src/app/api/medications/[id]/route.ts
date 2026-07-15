@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
 import { savePhoto } from "@/lib/upload";
+import {
+  cleanTimes,
+  sanitizeDaysOfWeek,
+  intOrNull,
+  optionalDate,
+} from "@/lib/medFields";
 
 async function authorizeMed(medId: string) {
   const user = await getCurrentUser();
@@ -36,6 +42,13 @@ export async function PUT(
     referencePhoto,
     active,
     times,
+    asNeeded,
+    daysOfWeek,
+    quantityPerDose,
+    supplyCount,
+    supplyThreshold,
+    startDate,
+    endDate,
   } = body;
 
   let referencePhotoUrl: string | undefined;
@@ -54,14 +67,29 @@ export async function PUT(
   if (imprint !== undefined) data.imprint = imprint || null;
   if (active !== undefined) data.active = Boolean(active);
   if (referencePhotoUrl !== undefined) data.referencePhotoUrl = referencePhotoUrl;
+  if (asNeeded !== undefined) data.asNeeded = Boolean(asNeeded);
+  if (daysOfWeek !== undefined) data.daysOfWeek = sanitizeDaysOfWeek(daysOfWeek);
+  if (quantityPerDose !== undefined) {
+    const q = intOrNull(quantityPerDose);
+    data.quantityPerDose = q && q > 0 ? q : 1;
+  }
+  if (supplyCount !== undefined) {
+    data.supplyCount = intOrNull(supplyCount);
+    // Re-arm the low-supply alert whenever supply is (re)set.
+    data.lowSupplyNotified = false;
+  }
+  if (supplyThreshold !== undefined) data.supplyThreshold = intOrNull(supplyThreshold);
+  const startD = optionalDate(startDate);
+  if (startD) data.startDate = startD;
+  const endD = optionalDate(endDate);
+  if (endDate !== undefined) data.endDate = endD ?? null;
 
   if (Array.isArray(times)) {
-    const cleanTimes: string[] = [
-      ...new Set((times as string[]).filter((t) => /^\d{2}:\d{2}$/.test(t))),
-    ].sort();
     data.times = {
       deleteMany: {},
-      create: cleanTimes.map((time) => ({ time })),
+      create: (Boolean(asNeeded) ? [] : cleanTimes(times)).map((time) => ({
+        time,
+      })),
     };
   }
 

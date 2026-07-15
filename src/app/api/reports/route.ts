@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
-import { materializeDoses, startOfDay, endOfDay } from "@/lib/dose";
+import { materializeDoses, getPatientTimezone } from "@/lib/dose";
+import { dayRangeInTz, todayYMD } from "@/lib/tz";
 
 // GET /api/reports?range=7|30&patientId=...
 export async function GET(req: Request) {
@@ -14,17 +15,16 @@ export async function GET(req: Request) {
   if (!patientId) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
 
   const range = searchParams.get("range") === "30" ? 30 : 7;
+  const tz = await getPatientTimezone(patientId);
 
-  const today = new Date();
-  const from = startOfDay(new Date(today.getTime() - (range - 1) * 86400000));
-  const to = endOfDay(today);
+  // Materialize doses for each calendar day in range (in the patient's tz) so
+  // history reflects the schedule even for days the app wasn't opened.
+  const days: string[] = [];
+  for (let i = range - 1; i >= 0; i--) days.push(todayYMD(tz, -i));
+  for (const ymd of days) await materializeDoses(patientId, ymd, tz);
 
-  // Materialize doses for each day in range so history reflects the schedule
-  // even for days the app wasn't opened.
-  for (let i = 0; i < range; i++) {
-    const day = new Date(from.getTime() + i * 86400000);
-    if (day <= today) await materializeDoses(patientId, day);
-  }
+  const from = dayRangeInTz(days[0], tz).start;
+  const to = dayRangeInTz(days[days.length - 1], tz).end;
 
   const doses = await prisma.doseLog.findMany({
     where: { patientId, scheduledFor: { gte: from, lte: to } },
