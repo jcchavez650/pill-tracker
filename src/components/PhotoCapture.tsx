@@ -42,31 +42,43 @@ export function PhotoCapture({
   label?: string;
 }) {
   const { t } = useI18n();
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Two inputs: one opens the camera (capture), one opens the photo library.
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    // Reset the input so re-selecting the same file fires change again.
+    e.target.value = "";
     if (!file) return;
     setBusy(true);
     try {
       const dataUrl = await fileToScaledDataUrl(file);
       onChange(dataUrl);
     } catch {
-      // ignore
+      // ignore decode errors
     } finally {
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
   return (
     <div>
+      {/* Camera: capture attribute asks mobile to open the camera directly. */}
       <input
-        ref={inputRef}
+        ref={cameraRef}
         type="file"
         accept="image/*"
         capture="environment"
+        onChange={handleFile}
+        className="hidden"
+      />
+      {/* Gallery: no capture attribute → opens the photo library / file picker. */}
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
         onChange={handleFile}
         className="hidden"
       />
@@ -82,27 +94,51 @@ export function PhotoCapture({
           <div className="flex gap-2">
             <button
               type="button"
-              className="btn-ghost flex-1"
-              onClick={() => inputRef.current?.click()}
+              className="btn-ghost flex-1 !py-2 text-xs"
+              onClick={() => cameraRef.current?.click()}
+              disabled={busy}
             >
-              {t("common.retake")}
+              📷 {t("common.takePhoto")}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost flex-1 !py-2 text-xs"
+              onClick={() => galleryRef.current?.click()}
+              disabled={busy}
+            >
+              🖼️ {t("common.gallery")}
             </button>
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className="flex w-full flex-col items-center justify-center gap-3 rounded-xl2 border-2 border-dashed border-champagne/30 bg-ink-muted/40 px-6 py-12 text-center transition hover:border-champagne/60"
-        >
+        <div className="flex flex-col items-center gap-4 rounded-xl2 border-2 border-dashed border-champagne/30 bg-ink-muted/40 px-6 py-8 text-center">
           <span className="text-4xl" aria-hidden>
             📷
           </span>
-          <span className="text-sm font-medium text-cream/80">
-            {busy ? t("common.loading") : label || t("common.openCamera")}
-          </span>
-        </button>
+          {label && (
+            <p className="text-sm font-medium text-cream/80">
+              {busy ? t("common.loading") : label}
+            </p>
+          )}
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => cameraRef.current?.click()}
+              disabled={busy}
+              className="btn-gold flex-1 !py-2.5 text-sm"
+            >
+              📷 {t("common.takePhoto")}
+            </button>
+            <button
+              type="button"
+              onClick={() => galleryRef.current?.click()}
+              disabled={busy}
+              className="btn-ghost flex-1 !py-2.5 text-sm"
+            >
+              🖼️ {t("common.gallery")}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
