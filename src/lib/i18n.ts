@@ -80,6 +80,7 @@ export const dictionaries = {
     "tomorrow.title": "Tomorrow",
     "tomorrow.subtitle": "A preview of tomorrow's medications.",
 
+    "med.forWhom": "Who is this for?",
     "med.name": "Medication name",
     "med.strength": "Strength",
     "med.form": "Form",
@@ -289,6 +290,7 @@ export const dictionaries = {
     "tomorrow.title": "Mañana",
     "tomorrow.subtitle": "Una vista previa de los medicamentos de mañana.",
 
+    "med.forWhom": "¿Para quién es?",
     "med.name": "Nombre del medicamento",
     "med.strength": "Concentración",
     "med.form": "Forma",

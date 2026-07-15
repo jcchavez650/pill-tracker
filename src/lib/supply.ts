@@ -33,26 +33,18 @@ export async function consumeSupply(medicationId: string): Promise<void> {
 
   if (!crossed) return;
 
-  const patient = await prisma.user.findUnique({
-    where: { id: med.patientId },
-    select: { caregiverId: true, name: true },
+  // Low-supply alert goes only to the person the medication is for.
+  await prisma.notification.create({
+    data: {
+      userId: med.patientId,
+      type: "lowsupply",
+      title: `Low supply: ${med.name}`,
+      body: `${newCount} left — time to refill.`,
+    },
   });
-  const targets = [med.patientId, patient?.caregiverId].filter(
-    (x): x is string => Boolean(x)
-  );
-  for (const uid of targets) {
-    await prisma.notification.create({
-      data: {
-        userId: uid,
-        type: "lowsupply",
-        title: `Low supply: ${med.name}`,
-        body: `${newCount} left — time to refill.`,
-      },
-    });
-    await sendPushToUser(uid, {
-      title: `Low supply — ${med.name}`,
-      body: `${newCount} pills left. Time to refill ${med.name}.`,
-      url: "/schedule",
-    });
-  }
+  await sendPushToUser(med.patientId, {
+    title: `Low supply — ${med.name}`,
+    body: `${newCount} pills left. Time to refill ${med.name}.`,
+    url: "/schedule",
+  });
 }

@@ -209,6 +209,11 @@ function MedForm({
   onSaved: () => void;
 }) {
   const { t, locale } = useI18n();
+  const { isCaregiver, patients, selfId, selfName } = usePatient();
+  // Who the medication is for. Editable on create; fixed on edit.
+  const [targetPatientId, setTargetPatientId] = useState<string>(
+    medication?.patientId || patientId || selfId
+  );
   const [form, setForm] = useState<FormState>(
     medication
       ? {
@@ -305,7 +310,7 @@ function MedForm({
     try {
       const payload = {
         ...data,
-        patientId,
+        patientId: targetPatientId,
         referencePhoto: data.referencePhoto || undefined,
       };
       const url = medication
@@ -335,6 +340,26 @@ function MedForm({
       title={medication ? t("med.editTitle") : t("med.addTitle")}
     >
       <div className="space-y-4">
+        {/* Who is this medication for? */}
+        {isCaregiver && (
+          <div>
+            <label className="label">{t("med.forWhom")}</label>
+            <select
+              className="input"
+              value={targetPatientId}
+              onChange={(e) => setTargetPatientId(e.target.value)}
+              disabled={!!medication}
+            >
+              <option value={selfId}>{selfName || t("patients.myself")}</option>
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* AI prescription scan */}
         <div className="rounded-2xl border border-champagne/25 bg-champagne/5 p-4">
           <div className="mb-1 flex items-center gap-2">

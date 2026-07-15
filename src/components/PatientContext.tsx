@@ -23,6 +23,7 @@ type PatientContextValue = {
   refreshPatients: () => Promise<void>;
   isCaregiver: boolean;
   selfId: string;
+  selfName: string;
 };
 
 const PatientContext = createContext<PatientContextValue | null>(null);
@@ -91,6 +92,7 @@ export function PatientProvider({
         refreshPatients,
         isCaregiver,
         selfId,
+        selfName,
       }}
     >
       {children}
