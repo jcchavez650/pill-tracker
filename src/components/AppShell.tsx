@@ -9,18 +9,31 @@ import { PatientProvider, usePatient } from "@/components/PatientContext";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import type { TranslationKey } from "@/lib/i18n";
 
-type NavItem = { href: string; key: TranslationKey; icon: string; caregiverOnly?: boolean };
+type NavItem = {
+  href: string;
+  key: TranslationKey;
+  shortKey?: TranslationKey; // compact label for the mobile bar
+  icon: string;
+  caregiverOnly?: boolean;
+};
 
-const NAV: NavItem[] = [
+// Primary tabs — the daily-use surfaces shown in the mobile bottom bar.
+const PRIMARY_NAV: NavItem[] = [
   { href: "/today", key: "nav.today", icon: "☀️" },
   { href: "/tomorrow", key: "nav.tomorrow", icon: "🌙" },
   { href: "/week", key: "nav.week", icon: "📆" },
-  { href: "/schedule", key: "nav.schedule", icon: "🗓️" },
-  { href: "/identify", key: "nav.identify", icon: "🔍" },
-  { href: "/reports", key: "nav.reports", icon: "📊" },
-  { href: "/patients", key: "nav.patients", icon: "👥", caregiverOnly: true },
+  { href: "/identify", key: "nav.identify", shortKey: "nav.identifyShort", icon: "🔍" },
   { href: "/settings", key: "nav.settings", icon: "⚙️" },
 ];
+
+// Management surfaces — reached from the Settings hub (and the desktop sidebar).
+const MANAGE_NAV: NavItem[] = [
+  { href: "/schedule", key: "nav.schedule", icon: "🗓️" },
+  { href: "/reports", key: "nav.reports", icon: "📊" },
+  { href: "/patients", key: "nav.patients", icon: "👥", caregiverOnly: true },
+];
+
+const MANAGE_HREFS = MANAGE_NAV.map((n) => n.href);
 
 function PatientSelector() {
   const { isCaregiver, patients, patientId, setPatientId, selfId } = usePatient();
@@ -30,7 +43,7 @@ function PatientSelector() {
     <select
       value={patientId ?? selfId}
       onChange={(e) => setPatientId(e.target.value)}
-      className="rounded-full border border-white/15 bg-ink-muted/70 px-4 py-2 text-sm text-cream outline-none focus:border-champagne/60"
+      className="max-w-[36vw] truncate rounded-full border border-white/15 bg-ink-muted/70 px-3 py-2 text-sm text-cream outline-none focus:border-champagne/60 sm:max-w-none sm:px-4"
       aria-label={t("reports.patient")}
     >
       <option value={selfId}>{t("patients.myself")}</option>
@@ -55,7 +68,15 @@ function Chrome({
   const router = useRouter();
   const { isCaregiver } = usePatient();
 
-  const items = NAV.filter((n) => !n.caregiverOnly || isCaregiver);
+  const primary = PRIMARY_NAV;
+  const manage = MANAGE_NAV.filter((n) => !n.caregiverOnly || isCaregiver);
+
+  // On a management page, keep the Settings tab highlighted in the bottom bar.
+  function isActive(href: string) {
+    if (href === "/settings")
+      return pathname === "/settings" || MANAGE_HREFS.includes(pathname);
+    return pathname === href;
+  }
 
   async function signOut() {
     await fetch("/api/auth/signout", { method: "POST" });
@@ -95,23 +116,24 @@ function Chrome({
         {/* Sidebar nav (desktop) */}
         <nav className="sticky top-20 hidden h-fit w-52 shrink-0 flex-col gap-1 md:flex">
           <p className="px-3 pb-2 text-xs text-cream/40">{userName}</p>
-          {items.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition ${
-                  active
-                    ? "bg-champagne/15 text-champagne-soft"
-                    : "text-cream/70 hover:bg-white/5 hover:text-cream"
-                }`}
-              >
-                <span aria-hidden>{item.icon}</span>
-                {t(item.key)}
-              </Link>
-            );
-          })}
+          {primary
+            .filter((n) => n.href !== "/settings")
+            .map((item) => (
+              <SidebarLink key={item.href} item={item} active={isActive(item.href)} t={t} />
+            ))}
+
+          <p className="mt-3 px-3 pb-1 text-[10px] uppercase tracking-widest text-cream/30">
+            {t("settings.manage")}
+          </p>
+          {manage.map((item) => (
+            <SidebarLink key={item.href} item={item} active={isActive(item.href)} t={t} />
+          ))}
+          <SidebarLink
+            item={{ href: "/settings", key: "nav.settings", icon: "⚙️" }}
+            active={pathname === "/settings"}
+            t={t}
+          />
+
           <button
             onClick={signOut}
             className="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-cream/50 transition hover:text-cream"
@@ -122,32 +144,67 @@ function Chrome({
         </nav>
 
         {/* Main content */}
-        <main className="min-w-0 flex-1 pb-24 md:pb-6">{children}</main>
+        <main className="min-w-0 flex-1 pb-28 md:pb-6">{children}</main>
       </div>
 
       {/* Bottom nav (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/90 backdrop-blur-md md:hidden">
-        <div className="mx-auto flex max-w-6xl items-stretch justify-around">
-          {items.map((item) => {
-            const active = pathname === item.href;
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/95 backdrop-blur-md md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="mx-auto flex max-w-lg items-stretch justify-around">
+          {primary.map((item) => {
+            const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] transition ${
+                aria-current={active ? "page" : undefined}
+                className={`flex flex-1 flex-col items-center gap-1 py-2.5 transition active:scale-95 ${
                   active ? "text-champagne-soft" : "text-cream/55"
                 }`}
               >
-                <span className="text-lg" aria-hidden>
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xl ${
+                    active ? "bg-champagne/15" : ""
+                  }`}
+                  aria-hidden
+                >
                   {item.icon}
                 </span>
-                {t(item.key)}
+                <span className="text-[11px] font-medium leading-none">
+                  {t(item.shortKey ?? item.key)}
+                </span>
               </Link>
             );
           })}
         </div>
       </nav>
     </div>
+  );
+}
+
+function SidebarLink({
+  item,
+  active,
+  t,
+}: {
+  item: NavItem;
+  active: boolean;
+  t: (k: TranslationKey) => string;
+}) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition ${
+        active
+          ? "bg-champagne/15 text-champagne-soft"
+          : "text-cream/70 hover:bg-white/5 hover:text-cream"
+      }`}
+    >
+      <span aria-hidden>{item.icon}</span>
+      {t(item.key)}
+    </Link>
   );
 }
 
