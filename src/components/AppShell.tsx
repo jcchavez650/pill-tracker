@@ -13,6 +13,7 @@ type NavItem = { href: string; key: TranslationKey; icon: string; caregiverOnly?
 
 const NAV: NavItem[] = [
   { href: "/today", key: "nav.today", icon: "☀️" },
+  { href: "/tomorrow", key: "nav.tomorrow", icon: "🌙" },
   { href: "/schedule", key: "nav.schedule", icon: "🗓️" },
   { href: "/identify", key: "nav.identify", icon: "🔍" },
   { href: "/reports", key: "nav.reports", icon: "📊" },
