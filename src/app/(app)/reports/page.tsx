@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/components/I18nProvider";
 import { usePatient } from "@/components/PatientContext";
+import { BackToSettings } from "@/components/BackToSettings";
 import type { Dose } from "@/lib/types";
 
 type ReportData = {
@@ -48,6 +49,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      <BackToSettings />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="display text-4xl text-cream">{t("reports.title")}</h1>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/I18nProvider";
 import { usePatient } from "@/components/PatientContext";
 
@@ -18,6 +20,13 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const { isCaregiver, patientId, selfId } = usePatient();
+  const router = useRouter();
+
+  async function signOut() {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/signin");
+    router.refresh();
+  }
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     "default"
   );
@@ -164,6 +173,51 @@ export default function SettingsPage() {
         <h1 className="display text-4xl text-cream">{t("settings.title")}</h1>
       </header>
 
+      {/* Manage hub — Schedule, Reports, Patients */}
+      <section>
+        <h2 className="mb-1 text-sm uppercase tracking-widest text-champagne/70">
+          {t("settings.manage")}
+        </h2>
+        <p className="mb-3 text-xs text-cream/50">{t("settings.manageHint")}</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Link
+            href="/schedule"
+            className="card flex items-center gap-3 p-4 transition active:scale-[0.98] hover:border-champagne/40"
+          >
+            <span className="text-2xl" aria-hidden>
+              🗓️
+            </span>
+            <span className="font-medium text-cream">{t("nav.schedule")}</span>
+          </Link>
+          <Link
+            href="/reports"
+            className="card flex items-center gap-3 p-4 transition active:scale-[0.98] hover:border-champagne/40"
+          >
+            <span className="text-2xl" aria-hidden>
+              📊
+            </span>
+            <span className="font-medium text-cream">{t("nav.reports")}</span>
+          </Link>
+          {isCaregiver && (
+            <Link
+              href="/patients"
+              className="card flex items-center gap-3 p-4 transition active:scale-[0.98] hover:border-champagne/40"
+            >
+              <span className="text-2xl" aria-hidden>
+                👥
+              </span>
+              <span className="font-medium text-cream">{t("nav.patients")}</span>
+            </Link>
+          )}
+        </div>
+      </section>
+
+      <div className="mt-2 h-px bg-white/10" />
+
+      <h2 className="text-sm uppercase tracking-widest text-champagne/70">
+        {t("settings.preferences")}
+      </h2>
+
       {/* Language */}
       <section className="card p-6">
         <h2 className="mb-4 text-sm uppercase tracking-widest text-champagne/70">
@@ -307,6 +361,14 @@ export default function SettingsPage() {
           </button>
         </form>
       </section>
+
+      {/* Sign out */}
+      <button
+        onClick={signOut}
+        className="btn-ghost w-full !border-red-400/30 text-red-200/90 hover:!border-red-400/60"
+      >
+        🚪 {t("nav.signout")}
+      </button>
     </div>
   );
 }

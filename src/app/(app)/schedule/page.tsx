@@ -5,6 +5,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { usePatient } from "@/components/PatientContext";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { Modal } from "@/components/Modal";
+import { BackToSettings } from "@/components/BackToSettings";
 import type { Medication } from "@/lib/types";
 
 type FormState = {
@@ -76,6 +77,7 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6">
+      <BackToSettings />
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="display text-4xl text-cream">{t("nav.schedule")}</h1>
