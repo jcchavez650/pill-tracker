@@ -11,6 +11,13 @@ export type Medication = {
   imprint: string | null;
   referencePhotoUrl: string | null;
   active: boolean;
+  asNeeded: boolean;
+  daysOfWeek: string | null;
+  quantityPerDose: number;
+  supplyCount: number | null;
+  supplyThreshold: number | null;
+  startDate?: string;
+  endDate?: string | null;
   times: { id: string; time: string }[];
 };
 
@@ -21,6 +28,7 @@ export type Dose = {
   scheduledFor: string;
   status: "PENDING" | "TAKEN" | "MISSED" | "SKIPPED";
   takenAt: string | null;
+  prepped?: boolean;
   aiVerdict: "UNVERIFIED" | "MATCH" | "MISMATCH" | "UNSURE";
   aiConfidence: number | null;
   aiNotes: string | null;

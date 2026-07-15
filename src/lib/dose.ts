@@ -1,4 +1,10 @@
 import { prisma } from "./prisma";
+import {
+  dayRangeInTz,
+  parseYMD,
+  weekdayForYMD,
+  zonedTimeToUtc,
+} from "./tz";
 
 // Re-export client-safe status helpers for server callers' convenience.
 export {
@@ -8,52 +14,57 @@ export {
 } from "./doseStatus";
 export type { DisplayStatus } from "./doseStatus";
 
-/** Local calendar helpers operating in the server's timezone. */
-export function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-export function endOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
-
-/** Combine a date with an "HH:MM" string into a Date on that day. */
-export function dateAtTime(day: Date, hhmm: string): Date {
-  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
-  const x = startOfDay(day);
-  x.setHours(h || 0, m || 0, 0, 0);
-  return x;
+/** Look up a patient's timezone (defaults to UTC). */
+export async function getPatientTimezone(patientId: string): Promise<string> {
+  const u = await prisma.user.findUnique({
+    where: { id: patientId },
+    select: { timezone: true },
+  });
+  return u?.timezone || "UTC";
 }
 
 /**
- * Ensure DoseLog rows exist for all of a patient's active medications on `day`.
- * Idempotent: uses the (medicationId, scheduledFor) unique key.
+ * Ensure DoseLog rows exist for all of a patient's scheduled medications on the
+ * calendar day `ymd` (YYYY-MM-DD), interpreted in the patient's timezone `tz`.
+ * Honors per-medication days-of-week and skips as-needed (PRN) medications.
+ * Idempotent via the (medicationId, scheduledFor) unique key.
  */
 export async function materializeDoses(
   patientId: string,
-  day: Date
+  ymd: string,
+  tz: string
 ): Promise<void> {
-  const dayStart = startOfDay(day);
-  const dayEnd = endOfDay(day);
+  const { start, end } = dayRangeInTz(ymd, tz);
+  const { year, month, day } = parseYMD(ymd);
+  const weekday = weekdayForYMD(year, month, day, tz);
 
   const meds = await prisma.medication.findMany({
     where: {
       patientId,
       active: true,
-      startDate: { lte: dayEnd },
-      OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
+      asNeeded: false,
+      startDate: { lte: end },
+      OR: [{ endDate: null }, { endDate: { gte: start } }],
     },
     include: { times: true },
   });
 
   const rows: { medicationId: string; scheduledFor: Date }[] = [];
   for (const med of meds) {
+    // Day-of-week filter: null/empty = every day.
+    if (med.daysOfWeek && med.daysOfWeek.trim() !== "") {
+      const allowed = med.daysOfWeek
+        .split(",")
+        .map((n) => parseInt(n, 10))
+        .filter((n) => !Number.isNaN(n));
+      if (!allowed.includes(weekday)) continue;
+    }
     for (const t of med.times) {
-      rows.push({ medicationId: med.id, scheduledFor: dateAtTime(day, t.time) });
+      const [h, m] = t.time.split(":").map((n) => parseInt(n, 10));
+      rows.push({
+        medicationId: med.id,
+        scheduledFor: zonedTimeToUtc(year, month, day, h || 0, m || 0, tz),
+      });
     }
   }
 

@@ -19,6 +19,7 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [resetPw, setResetPw] = useState<Record<string, string>>({});
 
   async function load() {
     setLoading(true);
@@ -28,6 +29,14 @@ export default function PatientsPage() {
       setPatients(data.patients || []);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resetPassword(id: string) {
+    const res = await fetch(`/api/patients/${id}/password`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setResetPw((m) => ({ ...m, [id]: data.password }));
     }
   }
 
@@ -56,26 +65,47 @@ export default function PatientsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {patients.map((p) => (
-            <div key={p.id} className="card flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-sheen text-lg font-bold text-ink">
-                {p.name.charAt(0).toUpperCase()}
+            <div key={p.id} className="card p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-sheen text-lg font-bold text-ink">
+                  {p.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-cream">{p.name}</p>
+                  <p className="truncate text-xs text-cream/50">{p.email}</p>
+                  <p className="text-xs text-cream/40">
+                    {p._count.medications} · {t("nav.schedule")}
+                  </p>
+                </div>
+                <button
+                  className="btn-ghost !py-2 text-xs"
+                  onClick={() => {
+                    setPatientId(p.id);
+                    window.location.href = "/today";
+                  }}
+                >
+                  {t("patients.view")}
+                </button>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-cream">{p.name}</p>
-                <p className="truncate text-xs text-cream/50">{p.email}</p>
-                <p className="text-xs text-cream/40">
-                  {p._count.medications} · {t("nav.schedule")}
-                </p>
+              <div className="mt-3">
+                {resetPw[p.id] ? (
+                  <p className="rounded-xl bg-ink-muted/60 px-3 py-2 text-sm">
+                    <span className="text-cream/50">
+                      {t("patients.newCredentials")}{" "}
+                    </span>
+                    <span className="font-mono text-champagne-soft">
+                      {resetPw[p.id]}
+                    </span>
+                  </p>
+                ) : (
+                  <button
+                    className="btn-quiet !py-1.5 text-xs text-cream/60"
+                    onClick={() => resetPassword(p.id)}
+                  >
+                    🔑 {t("patients.resetPassword")}
+                  </button>
+                )}
               </div>
-              <button
-                className="btn-ghost !py-2 text-xs"
-                onClick={() => {
-                  setPatientId(p.id);
-                  window.location.href = "/today";
-                }}
-              >
-                {t("patients.view")}
-              </button>
             </div>
           ))}
         </div>

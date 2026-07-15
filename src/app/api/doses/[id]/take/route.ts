@@ -5,6 +5,7 @@ import { resolvePatientId } from "@/lib/access";
 import { savePhoto } from "@/lib/upload";
 import { confirmDosePhoto } from "@/lib/anthropic";
 import { sendPushToUser } from "@/lib/push";
+import { consumeSupply } from "@/lib/supply";
 import type { Locale } from "@/lib/i18n";
 
 /**
@@ -66,6 +67,8 @@ export async function POST(
     }
   }
 
+  const wasTaken = dose.status === "TAKEN";
+
   const updated = await prisma.doseLog.update({
     where: { id },
     data: {
@@ -81,6 +84,9 @@ export async function POST(
       confirmationPhoto: { select: { id: true, url: true } },
     },
   });
+
+  // Decrement supply only on the first transition to TAKEN.
+  if (!wasTaken) await consumeSupply(dose.medicationId);
 
   // Notify the managing caregiver (if a patient took the dose, and especially
   // if the AI flagged a possible mismatch).

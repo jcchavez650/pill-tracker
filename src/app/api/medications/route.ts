@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
 import { savePhoto } from "@/lib/upload";
+import {
+  cleanTimes,
+  sanitizeDaysOfWeek,
+  intOrNull,
+  optionalDate,
+} from "@/lib/medFields";
 
 // GET /api/medications?patientId=...  — list a patient's medications
 export async function GET(req: Request) {
@@ -43,9 +49,20 @@ export async function POST(req: Request) {
     imprint,
     referencePhoto,
     times,
+    asNeeded,
+    daysOfWeek,
+    quantityPerDose,
+    supplyCount,
+    supplyThreshold,
+    startDate,
+    endDate,
   } = body;
 
-  if (!name || !Array.isArray(times) || times.length === 0) {
+  const isAsNeeded = asNeeded === true;
+  const timeList = cleanTimes(times);
+
+  // Scheduled meds need a name + at least one time; PRN meds just need a name.
+  if (!name || (!isAsNeeded && timeList.length === 0)) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
@@ -56,11 +73,9 @@ export async function POST(req: Request) {
     referencePhotoUrl = photo.url;
   }
 
-  const cleanTimes: string[] = [
-    ...new Set(
-      (times as string[]).filter((t) => /^\d{2}:\d{2}$/.test(t))
-    ),
-  ].sort();
+  const start = optionalDate(startDate);
+  const end = optionalDate(endDate);
+  const qty = intOrNull(quantityPerDose);
 
   const med = await prisma.medication.create({
     data: {
@@ -72,9 +87,16 @@ export async function POST(req: Request) {
       shape: shape || null,
       imprint: imprint || null,
       referencePhotoUrl: referencePhotoUrl || null,
+      asNeeded: isAsNeeded,
+      daysOfWeek: sanitizeDaysOfWeek(daysOfWeek),
+      quantityPerDose: qty && qty > 0 ? qty : 1,
+      supplyCount: intOrNull(supplyCount),
+      supplyThreshold: intOrNull(supplyThreshold),
+      ...(start ? { startDate: start } : {}),
+      ...(end !== undefined ? { endDate: end } : {}),
       patientId,
       createdById: user.id,
-      times: { create: cleanTimes.map((time) => ({ time })) },
+      times: { create: isAsNeeded ? [] : timeList.map((time) => ({ time })) },
     },
     include: { times: true },
   });

@@ -17,6 +17,13 @@ type FormState = {
   imprint: string;
   times: string[];
   referencePhoto: string | null;
+  asNeeded: boolean;
+  daysOfWeek: number[]; // empty = every day
+  quantityPerDose: string;
+  supplyCount: string;
+  supplyThreshold: string;
+  startDate: string;
+  endDate: string;
 };
 
 const emptyForm: FormState = {
@@ -29,6 +36,13 @@ const emptyForm: FormState = {
   imprint: "",
   times: ["08:00"],
   referencePhoto: null,
+  asNeeded: false,
+  daysOfWeek: [],
+  quantityPerDose: "1",
+  supplyCount: "",
+  supplyThreshold: "10",
+  startDate: "",
+  endDate: "",
 };
 
 export default function SchedulePage() {
@@ -106,14 +120,43 @@ export default function SchedulePage() {
                     <p className="text-sm text-cream/60">{m.instructions}</p>
                   )}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.times.map((tm) => (
-                      <span
-                        key={tm.id}
-                        className="chip border border-champagne/30 bg-champagne/10 text-champagne-soft"
-                      >
-                        {tm.time}
+                    {m.asNeeded ? (
+                      <span className="chip border border-white/15 bg-white/5 text-cream/70">
+                        {t("med.asNeeded")}
                       </span>
-                    ))}
+                    ) : (
+                      m.times.map((tm) => (
+                        <span
+                          key={tm.id}
+                          className="chip border border-champagne/30 bg-champagne/10 text-champagne-soft"
+                        >
+                          {tm.time}
+                        </span>
+                      ))
+                    )}
+                    {!m.asNeeded && m.daysOfWeek && (
+                      <span className="chip border border-white/15 bg-white/5 text-cream/60">
+                        {m.daysOfWeek
+                          .split(",")
+                          .map((d) => t(`day.${parseInt(d, 10)}` as never))
+                          .join(" ")}
+                      </span>
+                    )}
+                    {m.supplyCount != null && (
+                      <span
+                        className={`chip border ${
+                          m.supplyThreshold != null &&
+                          m.supplyCount <= m.supplyThreshold
+                            ? "border-red-400/40 bg-red-500/15 text-red-200"
+                            : "border-emerald-mid/40 bg-emerald-mid/10 text-emerald-100"
+                        }`}
+                      >
+                        {t("med.left", { n: m.supplyCount })}
+                        {m.supplyThreshold != null &&
+                          m.supplyCount <= m.supplyThreshold &&
+                          ` · ${t("med.lowSupply")}`}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -176,6 +219,24 @@ function MedForm({
           imprint: medication.imprint || "",
           times: medication.times.map((x) => x.time),
           referencePhoto: null,
+          asNeeded: medication.asNeeded,
+          daysOfWeek: medication.daysOfWeek
+            ? medication.daysOfWeek
+                .split(",")
+                .map((n) => parseInt(n, 10))
+                .filter((n) => !Number.isNaN(n))
+            : [],
+          quantityPerDose: String(medication.quantityPerDose ?? 1),
+          supplyCount:
+            medication.supplyCount != null ? String(medication.supplyCount) : "",
+          supplyThreshold:
+            medication.supplyThreshold != null
+              ? String(medication.supplyThreshold)
+              : "",
+          startDate: medication.startDate
+            ? medication.startDate.slice(0, 10)
+            : "",
+          endDate: medication.endDate ? medication.endDate.slice(0, 10) : "",
         }
       : emptyForm
   );
@@ -221,16 +282,15 @@ function MedForm({
       };
       setForm(merged);
 
-      // If we have enough to build a schedule (a name + at least one time),
-      // create it right away. Otherwise fall back to the review form.
-      if (merged.name.trim() && merged.times.length > 0) {
-        setScanMsg({ ok: true, text: t("med.scanCreating") });
-        await persist(merged);
-      } else if (merged.name.trim()) {
-        setScanMsg({ ok: true, text: t("med.scanNeedTimes") });
-      } else {
-        setScanMsg({ ok: true, text: t("med.scanReview") });
-      }
+      // Prefill the form for review — the caregiver confirms/edits before the
+      // schedule is created (review-before-create).
+      setScanMsg({
+        ok: true,
+        text:
+          merged.name.trim() && merged.times.length === 0
+            ? t("med.scanNeedTimes")
+            : t("med.scanReview"),
+      });
     } catch {
       setScanMsg({ ok: false, text: t("med.scanFailed") });
     } finally {
@@ -261,7 +321,8 @@ function MedForm({
   }
 
   async function save() {
-    if (!form.name.trim() || form.times.length === 0) return;
+    if (!form.name.trim()) return;
+    if (!form.asNeeded && form.times.length === 0) return;
     await persist(form);
   }
 
@@ -385,42 +446,173 @@ function MedForm({
           </div>
         </div>
 
-        <div>
-          <label className="label">{t("med.times")}</label>
-          <div className="space-y-2">
-            {form.times.map((time, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  type="time"
-                  className="input"
-                  value={time}
-                  onChange={(e) => {
-                    const next = [...form.times];
-                    next[i] = e.target.value;
-                    set("times", next);
-                  }}
-                />
+        {/* As needed (PRN) toggle */}
+        <label className="flex items-start gap-3 rounded-2xl border border-white/12 p-3">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 accent-champagne"
+            checked={form.asNeeded}
+            onChange={(e) => set("asNeeded", e.target.checked)}
+          />
+          <span>
+            <span className="text-sm font-medium text-cream">
+              {t("med.asNeeded")}
+            </span>
+            <span className="block text-xs text-cream/50">
+              {t("med.asNeededHint")}
+            </span>
+          </span>
+        </label>
+
+        {!form.asNeeded && (
+          <>
+            <div>
+              <label className="label">{t("med.times")}</label>
+              <div className="space-y-2">
+                {form.times.map((time, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="time"
+                      className="input"
+                      value={time}
+                      onChange={(e) => {
+                        const next = [...form.times];
+                        next[i] = e.target.value;
+                        set("times", next);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-quiet !px-3 text-red-300/70"
+                      onClick={() =>
+                        set(
+                          "times",
+                          form.times.filter((_, idx) => idx !== i)
+                        )
+                      }
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
                 <button
                   type="button"
-                  className="btn-quiet !px-3 text-red-300/70"
-                  onClick={() =>
-                    set(
-                      "times",
-                      form.times.filter((_, idx) => idx !== i)
-                    )
-                  }
+                  className="btn-ghost !py-2 text-xs"
+                  onClick={() => set("times", [...form.times, "12:00"])}
                 >
-                  ✕
+                  + {t("med.addTime")}
                 </button>
               </div>
-            ))}
-            <button
-              type="button"
-              className="btn-ghost !py-2 text-xs"
-              onClick={() => set("times", [...form.times, "12:00"])}
-            >
-              + {t("med.addTime")}
-            </button>
+            </div>
+
+            {/* Days of week */}
+            <div>
+              <label className="label">{t("med.days")}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+                  const on =
+                    form.daysOfWeek.length === 0 || form.daysOfWeek.includes(d);
+                  const everyDay = form.daysOfWeek.length === 0;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        // Starting from "every day", first tap selects just that day.
+                        let next = everyDay ? [] : [...form.daysOfWeek];
+                        if (everyDay) next = [d];
+                        else if (next.includes(d))
+                          next = next.filter((x) => x !== d);
+                        else next.push(d);
+                        set("daysOfWeek", next);
+                      }}
+                      className={`h-9 w-11 rounded-xl text-xs font-medium transition ${
+                        on && !everyDay
+                          ? "bg-champagne/20 text-champagne-soft"
+                          : everyDay
+                          ? "bg-white/5 text-cream/60"
+                          : "bg-white/5 text-cream/40"
+                      }`}
+                    >
+                      {t(`day.${d}` as never)}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.daysOfWeek.length === 0 && (
+                <p className="mt-1 text-xs text-cream/40">{t("med.everyDay")}</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Supply tracking */}
+        <div>
+          <label className="label">{t("med.supplyTitle")}</label>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <span className="mb-1 block text-[10px] text-cream/45">
+                {t("med.supplyCount")}
+              </span>
+              <input
+                type="number"
+                min={0}
+                className="input !px-3"
+                value={form.supplyCount}
+                onChange={(e) => set("supplyCount", e.target.value)}
+              />
+            </div>
+            <div>
+              <span className="mb-1 block text-[10px] text-cream/45">
+                {t("med.quantityPerDose")}
+              </span>
+              <input
+                type="number"
+                min={1}
+                className="input !px-3"
+                value={form.quantityPerDose}
+                onChange={(e) => set("quantityPerDose", e.target.value)}
+              />
+            </div>
+            <div>
+              <span className="mb-1 block text-[10px] text-cream/45">
+                {t("med.supplyThreshold")}
+              </span>
+              <input
+                type="number"
+                min={0}
+                className="input !px-3"
+                value={form.supplyThreshold}
+                onChange={(e) => set("supplyThreshold", e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Start / end dates */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">{t("med.startDate")}</label>
+            <input
+              type="date"
+              className="input"
+              value={form.startDate}
+              onChange={(e) => set("startDate", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">
+              {t("med.endDate")}{" "}
+              <span className="lowercase text-cream/40">
+                ({t("common.optional")})
+              </span>
+            </label>
+            <input
+              type="date"
+              className="input"
+              value={form.endDate}
+              onChange={(e) => set("endDate", e.target.value)}
+            />
           </div>
         </div>
 
