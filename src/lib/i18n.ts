@@ -11,6 +11,7 @@ export const dictionaries = {
     "app.tagline": "Care, made simple and beautiful.",
 
     "nav.today": "Today",
+    "nav.tomorrow": "Tomorrow",
     "nav.schedule": "Schedule",
     "nav.identify": "Identify a Pill",
     "nav.reports": "Reports",
@@ -74,6 +75,9 @@ export const dictionaries = {
     "today.verifiedMismatch": "This may not match. Please double-check.",
     "today.verifiedUnsure": "We couldn't be sure. Please review carefully.",
     "today.confidence": "Confidence",
+
+    "tomorrow.title": "Tomorrow",
+    "tomorrow.subtitle": "A preview of tomorrow's medications.",
 
     "med.name": "Medication name",
     "med.strength": "Strength",
@@ -164,6 +168,7 @@ export const dictionaries = {
     "app.tagline": "El cuidado, simple y hermoso.",
 
     "nav.today": "Hoy",
+    "nav.tomorrow": "Mañana",
     "nav.schedule": "Horario",
     "nav.identify": "Identificar Pastilla",
     "nav.reports": "Reportes",
@@ -227,6 +232,9 @@ export const dictionaries = {
     "today.verifiedMismatch": "Puede que no coincida. Por favor verifica.",
     "today.verifiedUnsure": "No pudimos estar seguros. Revisa con cuidado.",
     "today.confidence": "Confianza",
+
+    "tomorrow.title": "Mañana",
+    "tomorrow.subtitle": "Una vista previa de los medicamentos de mañana.",
 
     "med.name": "Nombre del medicamento",
     "med.strength": "Concentración",
