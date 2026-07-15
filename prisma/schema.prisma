@@ -39,6 +39,9 @@ model User {
   role         Role     @default(PATIENT)
   locale       String   @default("en") // "en" | "es"
   timezone     String   @default("UTC") // IANA tz, e.g. "America/New_York"
+  // When true, this patient's alerts (missed/low-supply/mismatch) are also
+  // sent to their managing caregiver as an oversight copy.
+  notifyCaregiver Boolean @default(false)
   createdAt    DateTime @default(now())
 
   // A caregiver manages many patients. A patient has one managing caregiver.

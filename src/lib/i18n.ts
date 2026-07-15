@@ -155,6 +155,7 @@ export const dictionaries = {
 
     "patients.resetPassword": "Reset password",
     "patients.newCredentials": "New password:",
+    "patients.notifyMe": "Also alert me about their reminders",
 
     "identify.title": "Identify a Pill",
     "identify.subtitle":
@@ -365,6 +366,7 @@ export const dictionaries = {
 
     "patients.resetPassword": "Restablecer contraseña",
     "patients.newCredentials": "Nueva contraseña:",
+    "patients.notifyMe": "Avisarme también sobre sus alertas",
 
     "identify.title": "Identificar una Pastilla",
     "identify.subtitle":

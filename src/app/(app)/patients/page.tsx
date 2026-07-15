@@ -11,6 +11,7 @@ type PatientRow = {
   name: string;
   email: string;
   locale: string;
+  notifyCaregiver: boolean;
   _count: { medications: number };
 };
 
@@ -39,6 +40,18 @@ export default function PatientsPage() {
       const data = await res.json();
       setResetPw((m) => ({ ...m, [id]: data.password }));
     }
+  }
+
+  async function toggleNotify(id: string, next: boolean) {
+    // Optimistic update.
+    setPatients((ps) =>
+      ps.map((p) => (p.id === id ? { ...p, notifyCaregiver: next } : p))
+    );
+    await fetch(`/api/patients/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifyCaregiver: next }),
+    }).catch(() => {});
   }
 
   useEffect(() => {
@@ -89,6 +102,28 @@ export default function PatientsPage() {
                   {t("patients.view")}
                 </button>
               </div>
+              {/* Caregiver oversight toggle */}
+              <label className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-ink-muted/40 px-3 py-2">
+                <span className="text-sm text-cream/75">
+                  🔔 {t("patients.notifyMe")}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={p.notifyCaregiver}
+                  onClick={() => toggleNotify(p.id, !p.notifyCaregiver)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                    p.notifyCaregiver ? "bg-gold-sheen" : "bg-white/15"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-ink transition-all ${
+                      p.notifyCaregiver ? "left-6" : "left-1"
+                    }`}
+                  />
+                </button>
+              </label>
+
               <div className="mt-3">
                 {resetPw[p.id] ? (
                   <p className="rounded-xl bg-ink-muted/60 px-3 py-2 text-sm">
