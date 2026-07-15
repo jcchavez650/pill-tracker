@@ -88,31 +88,22 @@ export async function POST(
   // Decrement supply only on the first transition to TAKEN.
   if (!wasTaken) await consumeSupply(dose.medicationId);
 
-  // Notify the managing caregiver (if a patient took the dose, and especially
-  // if the AI flagged a possible mismatch).
-  const patient = await prisma.user.findUnique({
-    where: { id: dose.patientId },
-    select: { caregiverId: true, name: true },
-  });
-  if (patient?.caregiverId) {
-    const flagged = verdict === "MISMATCH";
+  // On a possible mismatch, alert only the person the medication is for.
+  // (Success is shown live in the app, so no notification is needed then.)
+  if (verdict === "MISMATCH") {
     await prisma.notification.create({
       data: {
-        userId: patient.caregiverId,
-        type: flagged ? "confirmation" : "confirmation",
-        title: flagged
-          ? `⚠️ Possible mismatch: ${dose.medication.name}`
-          : `${patient.name} took ${dose.medication.name}`,
-        body: notes || "Dose confirmed.",
+        userId: dose.patientId,
+        type: "confirmation",
+        title: `⚠️ Possible mismatch: ${dose.medication.name}`,
+        body: notes || "Please double-check your pills.",
       },
     });
-    if (flagged) {
-      await sendPushToUser(patient.caregiverId, {
-        title: `⚠️ Check ${patient.name}'s pills`,
-        body: `${dose.medication.name}: ${notes || "possible mismatch"}`,
-        url: "/reports",
-      });
-    }
+    await sendPushToUser(dose.patientId, {
+      title: `⚠️ Check your pills — ${dose.medication.name}`,
+      body: notes || "This may not match what's expected.",
+      url: "/today",
+    });
   }
 
   return NextResponse.json({ dose: updated });

@@ -2,6 +2,7 @@
 
 export type Medication = {
   id: string;
+  patientId: string;
   name: string;
   strength: string | null;
   form: string | null;

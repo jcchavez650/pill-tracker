@@ -99,21 +99,20 @@ async function handle(req: Request) {
         data: { status: "MISSED" },
       });
       missed++;
-      if (patient.caregiverId) {
-        await prisma.notification.create({
-          data: {
-            userId: patient.caregiverId,
-            type: "missed",
-            title: `Missed dose: ${dose.medication.name}`,
-            body: `${patient.name} missed ${dose.medication.name}.`,
-          },
-        });
-        await sendPushToUser(patient.caregiverId, {
-          title: `Missed dose — ${patient.name}`,
+      // Missed-dose alert goes only to the person the medication is for.
+      await prisma.notification.create({
+        data: {
+          userId: patient.id,
+          type: "missed",
+          title: `Missed dose: ${dose.medication.name}`,
           body: `${dose.medication.name} was not taken.`,
-          url: "/reports",
-        });
-      }
+        },
+      });
+      await sendPushToUser(patient.id, {
+        title: `Missed dose — ${dose.medication.name}`,
+        body: `${dose.medication.name} was not taken.`,
+        url: "/today",
+      });
     }
   }
 
