@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { sendPushToUser } from "./push";
+import { notifyForMedication } from "./notify";
 
 /**
  * Decrement a medication's pill supply by one dose's worth. If supply is not
@@ -33,17 +33,10 @@ export async function consumeSupply(medicationId: string): Promise<void> {
 
   if (!crossed) return;
 
-  // Low-supply alert goes only to the person the medication is for.
-  await prisma.notification.create({
-    data: {
-      userId: med.patientId,
-      type: "lowsupply",
-      title: `Low supply: ${med.name}`,
-      body: `${newCount} left — time to refill.`,
-    },
-  });
-  await sendPushToUser(med.patientId, {
-    title: `Low supply — ${med.name}`,
+  // Alert the person the medication is for (+ caregiver if opted in).
+  await notifyForMedication(med.patientId, {
+    type: "lowsupply",
+    title: `Low supply: ${med.name}`,
     body: `${newCount} pills left. Time to refill ${med.name}.`,
     url: "/schedule",
   });

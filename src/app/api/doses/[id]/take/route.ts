@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { resolvePatientId } from "@/lib/access";
 import { savePhoto } from "@/lib/upload";
 import { confirmDosePhoto } from "@/lib/anthropic";
-import { sendPushToUser } from "@/lib/push";
 import { consumeSupply } from "@/lib/supply";
+import { notifyForMedication } from "@/lib/notify";
 import type { Locale } from "@/lib/i18n";
 
 /**
@@ -88,20 +88,13 @@ export async function POST(
   // Decrement supply only on the first transition to TAKEN.
   if (!wasTaken) await consumeSupply(dose.medicationId);
 
-  // On a possible mismatch, alert only the person the medication is for.
-  // (Success is shown live in the app, so no notification is needed then.)
+  // On a possible mismatch, alert the person the medication is for (and their
+  // caregiver if opted in). Success is shown live in the app, so no alert then.
   if (verdict === "MISMATCH") {
-    await prisma.notification.create({
-      data: {
-        userId: dose.patientId,
-        type: "confirmation",
-        title: `⚠️ Possible mismatch: ${dose.medication.name}`,
-        body: notes || "Please double-check your pills.",
-      },
-    });
-    await sendPushToUser(dose.patientId, {
-      title: `⚠️ Check your pills — ${dose.medication.name}`,
-      body: notes || "This may not match what's expected.",
+    await notifyForMedication(dose.patientId, {
+      type: "confirmation",
+      title: `⚠️ Possible mismatch: ${dose.medication.name}`,
+      body: notes || "Please double-check the pills.",
       url: "/today",
     });
   }

@@ -17,6 +17,7 @@ export async function GET() {
       name: true,
       email: true,
       locale: true,
+      notifyCaregiver: true,
       _count: { select: { medications: true } },
     },
     orderBy: { createdAt: "asc" },

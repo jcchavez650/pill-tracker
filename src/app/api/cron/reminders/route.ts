@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { materializeDoses } from "@/lib/dose";
 import { sendPushToUser } from "@/lib/push";
+import { notifyForMedication } from "@/lib/notify";
 import { translate } from "@/lib/i18n";
 import { todayYMD } from "@/lib/tz";
 import type { Locale } from "@/lib/i18n";
@@ -99,17 +100,10 @@ async function handle(req: Request) {
         data: { status: "MISSED" },
       });
       missed++;
-      // Missed-dose alert goes only to the person the medication is for.
-      await prisma.notification.create({
-        data: {
-          userId: patient.id,
-          type: "missed",
-          title: `Missed dose: ${dose.medication.name}`,
-          body: `${dose.medication.name} was not taken.`,
-        },
-      });
-      await sendPushToUser(patient.id, {
-        title: `Missed dose — ${dose.medication.name}`,
+      // Alert the person the medication is for (+ caregiver if opted in).
+      await notifyForMedication(patient.id, {
+        type: "missed",
+        title: `Missed dose: ${dose.medication.name}`,
         body: `${dose.medication.name} was not taken.`,
         url: "/today",
       });
