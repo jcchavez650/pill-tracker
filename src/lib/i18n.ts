@@ -32,6 +32,9 @@ export const dictionaries = {
     "common.retake": "Retake photo",
     "common.usePhoto": "Use this photo",
     "common.openCamera": "Open camera",
+    "common.takePhoto": "Take photo",
+    "common.gallery": "Choose from gallery",
+    "common.changePhoto": "Change photo",
 
     "auth.welcome": "Welcome back",
     "auth.signInSubtitle": "Sign in to continue caring.",
@@ -182,6 +185,9 @@ export const dictionaries = {
     "common.retake": "Tomar otra foto",
     "common.usePhoto": "Usar esta foto",
     "common.openCamera": "Abrir cámara",
+    "common.takePhoto": "Tomar foto",
+    "common.gallery": "Elegir de la galería",
+    "common.changePhoto": "Cambiar foto",
 
     "auth.welcome": "Bienvenido de nuevo",
     "auth.signInSubtitle": "Inicia sesión para continuar cuidando.",
