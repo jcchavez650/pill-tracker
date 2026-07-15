@@ -93,6 +93,9 @@ export const dictionaries = {
     "med.scanButton": "Fill from photo",
     "med.scanning": "Reading the prescription…",
     "med.scanReview": "Review and adjust the details below before saving.",
+    "med.scanNeedTimes": "I read the medication but couldn't tell the times. Add them below, then save.",
+    "med.scanCreating": "Creating the schedule…",
+    "med.scanCreated": "Schedule created from the prescription. ✨",
     "med.scanFailed": "Couldn't read a prescription from that photo. Please enter the details manually.",
     "med.orManually": "or enter details manually",
 
@@ -240,6 +243,9 @@ export const dictionaries = {
     "med.scanButton": "Completar desde la foto",
     "med.scanning": "Leyendo la receta…",
     "med.scanReview": "Revisa y ajusta los datos antes de guardar.",
+    "med.scanNeedTimes": "Leí el medicamento pero no pude determinar las horas. Agrégalas abajo y guarda.",
+    "med.scanCreating": "Creando el horario…",
+    "med.scanCreated": "Horario creado desde la receta. ✨",
     "med.scanFailed": "No se pudo leer una receta en esa foto. Ingresa los datos manualmente.",
     "med.orManually": "o ingresa los datos manualmente",
 

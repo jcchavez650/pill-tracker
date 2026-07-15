@@ -206,20 +206,31 @@ function MedForm({
         setScanMsg({ ok: false, text: t("med.scanFailed") });
         return;
       }
-      // Merge any fields the AI found into the form (keep existing otherwise).
-      setForm((prev) => ({
-        ...prev,
-        name: f.name || prev.name,
-        strength: f.strength || prev.strength,
-        form: f.form || prev.form,
-        instructions: f.instructions || prev.instructions,
-        color: f.color || prev.color,
-        shape: f.shape || prev.shape,
-        imprint: f.imprint || prev.imprint,
+      // Merge what the AI found into the form (keep existing values otherwise).
+      const merged: FormState = {
+        ...form,
+        name: f.name || form.name,
+        strength: f.strength || form.strength,
+        form: f.form || form.form,
+        instructions: f.instructions || form.instructions,
+        color: f.color || form.color,
+        shape: f.shape || form.shape,
+        imprint: f.imprint || form.imprint,
         times:
-          Array.isArray(f.times) && f.times.length > 0 ? f.times : prev.times,
-      }));
-      setScanMsg({ ok: true, text: t("med.scanReview") });
+          Array.isArray(f.times) && f.times.length > 0 ? f.times : form.times,
+      };
+      setForm(merged);
+
+      // If we have enough to build a schedule (a name + at least one time),
+      // create it right away. Otherwise fall back to the review form.
+      if (merged.name.trim() && merged.times.length > 0) {
+        setScanMsg({ ok: true, text: t("med.scanCreating") });
+        await persist(merged);
+      } else if (merged.name.trim()) {
+        setScanMsg({ ok: true, text: t("med.scanNeedTimes") });
+      } else {
+        setScanMsg({ ok: true, text: t("med.scanReview") });
+      }
     } catch {
       setScanMsg({ ok: false, text: t("med.scanFailed") });
     } finally {
@@ -227,14 +238,13 @@ function MedForm({
     }
   }
 
-  async function save() {
-    if (!form.name.trim() || form.times.length === 0) return;
+  async function persist(data: FormState) {
     setBusy(true);
     try {
       const payload = {
-        ...form,
+        ...data,
         patientId,
-        referencePhoto: form.referencePhoto || undefined,
+        referencePhoto: data.referencePhoto || undefined,
       };
       const url = medication
         ? `/api/medications/${medication.id}`
@@ -248,6 +258,11 @@ function MedForm({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function save() {
+    if (!form.name.trim() || form.times.length === 0) return;
+    await persist(form);
   }
 
   return (
