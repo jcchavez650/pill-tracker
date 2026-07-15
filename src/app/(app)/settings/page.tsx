@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/components/I18nProvider";
+import { usePatient } from "@/components/PatientContext";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 
@@ -16,6 +17,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
+  const { isCaregiver, patientId, selfId } = usePatient();
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     "default"
   );
@@ -51,12 +53,19 @@ export default function SettingsPage() {
   async function saveTimezone(next: string) {
     setTz(next);
     setTzSaved(false);
+    // Caregivers viewing a specific patient set that patient's timezone too.
+    const forPatient =
+      isCaregiver && patientId && patientId !== selfId ? patientId : undefined;
     const res = await fetch("/api/settings/timezone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timezone: next }),
+      body: JSON.stringify({ timezone: next, patientId: forPatient }),
     });
-    if (res.ok) setTzSaved(true);
+    if (res.ok) {
+      setTzSaved(true);
+      // Reflect the corrected schedule immediately.
+      setTimeout(() => window.location.reload(), 400);
+    }
   }
 
   function toggleTextSize() {

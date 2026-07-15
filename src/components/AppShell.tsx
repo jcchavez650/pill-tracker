@@ -171,20 +171,34 @@ export function AppShell({
     }
   }, []);
 
-  // Auto-detect the timezone on first use if it hasn't been set yet.
+  // Auto-detect the device timezone and apply it where it's still unset:
+  // the current user (if on default UTC) and, for caregivers, any managed
+  // patient still on UTC. Refresh once if that corrected any schedules.
   useEffect(() => {
-    if (timezone && timezone !== "UTC") return;
+    let detected = "UTC";
     try {
-      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (detected && detected !== "UTC") {
-        fetch("/api/settings/timezone", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ timezone: detected }),
-        }).catch(() => {});
-      }
+      detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     } catch {}
-  }, [timezone]);
+    if (!detected || detected === "UTC") return;
+
+    const selfNeedsSet = !timezone || timezone === "UTC";
+    // Nothing to do for a non-caregiver whose timezone is already set.
+    if (!isCaregiver && !selfNeedsSet) return;
+
+    fetch("/api/settings/timezone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timezone: detected, includeSelf: selfNeedsSet }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.changed > 0 && !sessionStorage.getItem("pt_tz_fixed")) {
+          sessionStorage.setItem("pt_tz_fixed", "1");
+          window.location.reload();
+        }
+      })
+      .catch(() => {});
+  }, [timezone, isCaregiver]);
 
   // Apply the saved large-text preference.
   useEffect(() => {

@@ -19,6 +19,7 @@ export default function WeekPage() {
   const { patientId } = usePatient();
   const [days, setDays] = useState<string[]>([]);
   const [doses, setDoses] = useState<Dose[]>([]);
+  const [tz, setTz] = useState<string>("UTC");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -31,6 +32,7 @@ export default function WeekPage() {
       const data = await res.json();
       setDays(data.days || []);
       setDoses(data.doses || []);
+      if (data.tz) setTz(data.tz);
     } finally {
       setLoading(false);
     }
@@ -46,28 +48,39 @@ export default function WeekPage() {
     return new Date(iso).toLocaleTimeString(loc, {
       hour: "numeric",
       minute: "2-digit",
+      timeZone: tz,
     });
   }
   function dayHeader(ymd: string) {
-    const d = new Date(ymd + "T12:00:00");
-    return d.toLocaleDateString(loc, { weekday: "long", month: "short", day: "numeric" });
+    // Noon UTC then format in patient tz to get a stable weekday label.
+    const d = new Date(ymd + "T12:00:00Z");
+    return d.toLocaleDateString(loc, {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      timeZone: tz,
+    });
   }
   function isToday(ymd: string) {
-    const d = new Date();
-    const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
-    ).padStart(2, "0")}`;
+    const t = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
     return t === ymd;
   }
 
-  // Group doses by their calendar day (matching the `days` list) in `loc`.
+  // Group doses by their calendar day (in the patient timezone).
   function dosesForDay(ymd: string): Dose[] {
     return doses
       .filter((dose) => {
-        const d = new Date(dose.scheduledFor);
-        const key = d.toLocaleDateString("en-CA", {
-          // en-CA => YYYY-MM-DD; compare in the same tz the server used implicitly
-        });
+        const key = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tz,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(dose.scheduledFor));
         return key === ymd;
       })
       .sort(
