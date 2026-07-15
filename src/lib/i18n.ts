@@ -88,6 +88,13 @@ export const dictionaries = {
     "med.saved": "Medication saved.",
     "med.none": "No medications yet. Add the first one.",
     "med.perDay": "per day",
+    "med.scanTitle": "Scan prescription with AI",
+    "med.scanHint": "Take a photo of the prescription label or bottle and Claude will fill in the details for you.",
+    "med.scanButton": "Fill from photo",
+    "med.scanning": "Reading the prescription…",
+    "med.scanReview": "Review and adjust the details below before saving.",
+    "med.scanFailed": "Couldn't read a prescription from that photo. Please enter the details manually.",
+    "med.orManually": "or enter details manually",
 
     "identify.title": "Identify a Pill",
     "identify.subtitle":
@@ -228,6 +235,13 @@ export const dictionaries = {
     "med.saved": "Medicamento guardado.",
     "med.none": "Aún no hay medicamentos. Agrega el primero.",
     "med.perDay": "por día",
+    "med.scanTitle": "Escanear receta con IA",
+    "med.scanHint": "Toma una foto de la etiqueta o el frasco de la receta y Claude completará los datos por ti.",
+    "med.scanButton": "Completar desde la foto",
+    "med.scanning": "Leyendo la receta…",
+    "med.scanReview": "Revisa y ajusta los datos antes de guardar.",
+    "med.scanFailed": "No se pudo leer una receta en esa foto. Ingresa los datos manualmente.",
+    "med.orManually": "o ingresa los datos manualmente",
 
     "identify.title": "Identificar una Pastilla",
     "identify.subtitle":
