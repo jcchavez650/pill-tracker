@@ -7,6 +7,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PatientProvider, usePatient } from "@/components/PatientContext";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { ScrollFX } from "@/components/ScrollFX";
 import type { TranslationKey } from "@/lib/i18n";
 
 type NavItem = {
@@ -268,6 +269,7 @@ export function AppShell({
 
   return (
     <PatientProvider selfId={selfId} selfName={userName} isCaregiver={isCaregiver}>
+      <ScrollFX />
       <Chrome userName={userName}>{children}</Chrome>
     </PatientProvider>
   );
